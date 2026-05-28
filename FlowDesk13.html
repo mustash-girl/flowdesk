@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FlowDesk</title>
+<link href="https://fonts.googleapis.com/css2?family=Righteous&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0F0F1A;color:#E8E6F0;font-family:'Nunito',system-ui,sans-serif;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#2E2B45;border-radius:99px;}
+input,select,textarea,button{font-family:inherit;}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;border:1px solid;white-space:nowrap;}
+.card{background:#1C1C30;border-radius:13px;padding:15px 17px;}
+.btn-ghost{background:#232338;color:#A899FF;border:1px solid #2E2B45;border-radius:9px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer;}
+.btn-primary{background:#7B6FFF;color:#fff;border:none;border-radius:9px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;}
+.btn-sm{padding:6px 13px;font-size:12px;}
+.inp{width:100%;padding:9px 13px;border-radius:9px;border:1.5px solid #2E2B45;font-size:14px;outline:none;background:#232338;color:#F0EEF8;box-sizing:border-box;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,Fragment}=React;
+
+// ── Palette ───────────────────────────────────────────────────────────────────
+const R={
+  red:   {h:"#FF4D4D",bg:"#2A1010",b:"#7A1A1A",t:"#FF8080"},
+  orange:{h:"#FF8C42",bg:"#2A1600",b:"#7A3A00",t:"#FFB07A"},
+  yellow:{h:"#FFD600",bg:"#2A2000",b:"#7A5500",t:"#FFE566"},
+  green: {h:"#3DCC7E",bg:"#0A2018",b:"#1A5A30",t:"#70EDAA"},
+  blue:  {h:"#4D9FFF",bg:"#0A1828",b:"#1A3A6A",t:"#80BFFF"},
+  indigo:{h:"#7B6FFF",bg:"#121028",b:"#2E236A",t:"#A899FF"},
+  violet:{h:"#CC55FF",bg:"#1E0A28",b:"#5A1A7A",t:"#E099FF"},
+  pink:  {h:"#FF6EC7",bg:"#2A0A1E",b:"#7A1A55",t:"#FF9FDD"},
+  teal:  {h:"#2ECFD4",bg:"#041E20",b:"#0A5A60",t:"#5EEEF3"},
+  grey:  {h:"#B0AAC8",bg:"#1A1A2A",b:"#3A3855",t:"#D0CCEC"},
+};
+const D={bg0:"#0F0F1A",bg1:"#16162A",bg2:"#1C1C30",bg3:"#232338",bd:"#2E2B45",t1:"#F0EEF8",t2:"#C8C4E0",t3:"#8A87A8"};
+const RB="linear-gradient(90deg,#FF4D4D,#FF8C42,#FFD600,#3DCC7E,#4D9FFF,#7B6FFF,#CC55FF)";
+const RC=["#FF4D4D","#FF8C42","#FFD600","#3DCC7E","#4D9FFF","#7B6FFF","#CC55FF"];// rainbow by dow
+
+// ── System data (editable in settings) ───────────────────────────────────────
+const DEF_CATS=[
+  {id:"accounting",name:"ACCOUNTING",icon:"💰",ramp:"yellow"},
+  {id:"operations",name:"OPERATIONS",icon:"⚙️",ramp:"orange"},
+  {id:"nst",       name:"NST",       icon:"🚚",ramp:"blue"},
+  {id:"sweetpac",  name:"SWEETPAC",  icon:"📦",ramp:"violet"},
+  {id:"safety",    name:"SAFETY",    icon:"🛡️",ramp:"red"},
+  {id:"misc",      name:"MISC",      icon:"📋",ramp:"grey"},
+  {id:"analytics", name:"ANALYTICS", icon:"📊",ramp:"yellow"},
+  {id:"dashboard2",name:"DASHBOARD", icon:"🖥️",ramp:"indigo"},
+  {id:"workflow",  name:"WORKFLOW",  icon:"🔄",ramp:"green"},
+  {id:"automation",name:"AUTOMATION",icon:"⚡",ramp:"indigo"},
+  {id:"claude",    name:"CLAUDE",    icon:"🤖",ramp:"violet"},
+  {id:"mcleod",    name:"MCLEOD",    icon:"🗂️",ramp:"teal"},
+  {id:"other",     name:"OTHER",     icon:"📌",ramp:"grey"},
+  {id:"personal",  name:"PERSONAL",  icon:"🏠",ramp:"pink"},
+];
+const DEPT_IDS=DEF_CATS.slice(0,6).map(c=>c.id);
+const TAG_IDS= DEF_CATS.slice(6).map(c=>c.id);
+
+const DEF_STATUSES=[
+  {id:"todo",    name:"To Do",      icon:"○",ramp:"blue"},
+  {id:"inprog",  name:"In Progress",icon:"▶",ramp:"green"},
+  {id:"block",   name:"Roadblock",  icon:"⚠",ramp:"pink"},
+  {id:"testing", name:"Testing",    icon:"⚗",ramp:"yellow"},
+  {id:"parked",  name:"Parked",     icon:"⏸",ramp:"orange"},
+  {id:"complete",name:"Complete",   icon:"✓",ramp:"grey"},
+];
+
+const TYPES=["Task","Appointment","Meeting","Other"];
+const TM={"Task":{t:R.blue.t,bg:R.blue.bg,b:R.blue.b,icon:"📌"},"Appointment":{t:R.violet.t,bg:R.violet.bg,b:R.violet.b,icon:"📅"},"Meeting":{t:R.green.t,bg:R.green.bg,b:R.green.b,icon:"🤝"},"Other":{t:R.grey.t,bg:R.grey.bg,b:R.grey.b,icon:"📋"}};
+const FM={work:{l:"Work",bg:R.blue.bg,t:R.blue.t,b:R.blue.b},personal:{l:"Personal",bg:R.violet.bg,t:R.violet.t,b:R.violet.b}};
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+const uid=()=>Date.now()+Math.random().toString(36).slice(2);
+const fmtD=d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${m}/${day}/${y}`;};
+const today=()=>new Date().toISOString().slice(0,10);
+const mkD=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+const due=d=>d?Math.ceil((new Date(d)-new Date(today()))/86400000):999;
+const snoozed=t=>t.snoozedUntil&&t.snoozedUntil>today();
+const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+const ramp=n=>R[n]||R.grey;
+const cat=(cats,id)=>cats.find(c=>c.id===id)||(id==='_deleted'?{id:'_deleted',name:'DELETED',icon:'🗑',ramp:'grey'}:cats.find(c=>c.id==='other')||cats[0]);
+const sname=(statuses,n)=>statuses.find(s=>s.name===n)||statuses[0];
+
+// ── Sample data ───────────────────────────────────────────────────────────────
+const T0=today();
+const INIT_TASKS=[
+  {id:1,title:"Route optimization audit",  deptId:"operations",status:"In Progress",flag:"work",type:"Task",priority:true, due:mkD(6), start:mkD(-7),tags:["analytics","workflow"],notes:"Review last 3 months of route data",snoozedUntil:null,attachments:[]},
+  {id:2,title:"Driver onboarding docs",     deptId:"operations",status:"To Do",      flag:"work",type:"Task",priority:false,due:mkD(14),start:mkD(4), tags:["workflow"],             notes:"",snoozedUntil:null,attachments:[]},
+  {id:3,title:"Carrier contract renewal",   deptId:"operations",status:"Roadblock",  flag:"work",type:"Task",priority:true, due:mkD(3), start:mkD(-12),tags:["mcleod"],              notes:"Waiting on legal review",snoozedUntil:null,attachments:[]},
+  {id:4,title:"Warehouse layout redesign",  deptId:"safety",    status:"Parked",     flag:"work",type:"Task",priority:false,due:mkD(35),start:mkD(19),tags:["other"],                notes:"",snoozedUntil:null,attachments:[]},
+  {id:5,title:"Q3 KPI dashboard",           deptId:"accounting",status:"Testing",    flag:"work",type:"Task",priority:false,due:mkD(19),start:mkD(4), tags:["dashboard2","analytics"],notes:"",snoozedUntil:null,attachments:[]},
+  {id:6,title:"Annual vehicle inspection",  deptId:"safety",    status:"Complete",   flag:"work",type:"Appointment",priority:false,due:mkD(-7),start:mkD(-17),tags:["analytics"],notes:"",snoozedUntil:null,attachments:[]},
+  {id:7,title:"Dentist appointment",        deptId:"misc",      status:"To Do",      flag:"personal",type:"Appointment",priority:false,due:mkD(9),start:mkD(9),tags:["personal"],notes:"Downtown Dental, 9am",snoozedUntil:null,attachments:[]},
+  {id:8,title:"Book team offsite venue",    deptId:"sweetpac",  status:"In Progress",flag:"work",type:"Meeting",priority:false,due:mkD(24),start:mkD(-2),tags:["other"],notes:"",snoozedUntil:null,attachments:[]},
+  {id:9,title:"Automation pipeline build",  deptId:"nst",       status:"To Do",      flag:"work",type:"Task",priority:true, due:mkD(10),start:mkD(1), tags:["automation","claude"],  notes:"Claude integration for dispatch",snoozedUntil:null,attachments:[]},
+];
+const INIT_EVENTS=[
+  {id:1,title:"Fleet ops standup",    date:mkD(1), time:"09:00",flag:"work",    contact:"Team",         type:"Meeting",    masterFileId:null},
+  {id:2,title:"Carrier contract call",date:mkD(3), time:"14:00",flag:"work",    contact:"TruckCo",      type:"Meeting",    masterFileId:2},
+  {id:3,title:"Dentist",              date:mkD(9), time:"09:15",flag:"personal",contact:"Downtown Dental",type:"Appointment",masterFileId:1},
+  {id:4,title:"Q3 planning all-hands",date:mkD(14),time:"10:00",flag:"work",    contact:"",             type:"Meeting",    masterFileId:null},
+  {id:5,title:"Driver safety training",date:mkD(16),time:"13:30",flag:"work",   contact:"",             type:"Appointment",masterFileId:null},
+];
+const INIT_NOTES=[
+  {id:1,title:"Carrier negotiation points",content:"Emphasize volume commitments. Ask about fuel surcharge caps.",tags:["mcleod"],pinned:true, created:T0,folder:"work",attachments:[]},
+  {id:2,title:"Warehouse layout ideas",    content:"Move staging area closer to dock 3. Consider vertical shelving.",tags:["other"],pinned:false,created:T0,folder:"work",attachments:[]},
+  {id:3,title:"Grocery list",              content:"Milk, eggs, bread, coffee.",tags:["personal"],pinned:false,created:T0,folder:"personal",attachments:[]},
+];
+const INIT_IDEAS=[
+  {id:1,title:"Real-time driver tracking",   detail:"Live map showing all drivers with ETA overlays.",priority:false,attachments:[]},
+  {id:2,title:"Automated carrier scorecards",detail:"Monthly report auto-generated from delivery data.",priority:true,attachments:[]},
+  {id:3,title:"Cross-dock partner portal",   detail:"Let partners submit availability directly.",priority:false,attachments:[]},
+];
+const INIT_CONTACTS=[
+  {id:1,name:"Downtown Dental",        address:"123 Main St, Fort Worth TX",    phone:"817-555-0110",email:"info@downtowndental.com",hours:"Mon–Fri 8am–5pm",type:"personal"},
+  {id:2,name:"Fort Worth Fleet Repairs",address:"88 Commerce Dr, Fort Worth TX", phone:"817-555-0330",email:"service@fwfleet.com",    hours:"Mon–Sat 7am–7pm",type:"work"},
+  {id:3,name:"TruckCo Logistics",      address:"500 Industrial Blvd, Dallas TX", phone:"214-555-0220",email:"contracts@truckco.com",  hours:"Mon–Fri 7am–6pm",type:"work"},
+];
+
+// ── Shared tiny components ────────────────────────────────────────────────────
+const Chip=({bg,b,t,children})=><span className="chip" style={{background:bg,borderColor:b,color:t}}>{children}</span>;
+const CatChip=({cats,id})=>{const c=cat(cats,id),r=ramp(c.ramp);return<Chip bg={r.bg} b={r.b} t={r.t}>{c.icon} {c.name}</Chip>;};
+const SBadge=({statuses,n})=>{const s=sname(statuses,n),r=ramp(s.ramp);return<Chip bg={r.bg} b={r.b} t={r.h}>{s.icon} {n}</Chip>;};
+const FChip=({flag})=>{const f=FM[flag]||FM.work;return<Chip bg={f.bg} b={f.b} t={f.t}>{f.l}</Chip>;};
+const TChip=({type})=>{const m=TM[type]||TM.Task;return<Chip bg={m.bg} b={m.b} t={m.t}>{m.icon} {type}</Chip>;};
+const PBadge=()=><Chip bg={R.red.bg} b={R.red.b} t={R.red.t}>🔴 Priority</Chip>;
+const TagPip=({cats,id})=>{const c=cat(cats,id),r=ramp(c.ramp);return<span style={{fontSize:10,fontWeight:700,background:r.bg,color:r.t,border:`1px solid ${r.b}`,padding:"1px 6px",borderRadius:99,whiteSpace:"nowrap"}}>{c.icon} {c.name}</span>;};
+
+function Btn({children,onClick,variant="primary",sm=false,style:s={}}){
+  const styles={primary:{background:R.indigo.h,color:"#fff"},ghost:{background:D.bg3,color:R.indigo.t,border:`1px solid ${D.bd}`},danger:{background:R.red.bg,color:R.red.t,border:`1px solid ${R.red.b}`}};
+  return<button onClick={onClick} style={{cursor:"pointer",border:"none",borderRadius:9,fontFamily:"inherit",fontWeight:700,display:"inline-flex",alignItems:"center",gap:6,padding:sm?"6px 13px":"9px 18px",fontSize:sm?12:14,...(styles[variant]||styles.primary),...s}}>{children}</button>;
+}
+function Modal({title,onClose,children,wide}){
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:D.bg2,borderRadius:16,padding:"24px 26px",maxWidth:wide?800:560,width:"100%",border:`1px solid ${D.bd}`,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <span style={{fontSize:17,fontWeight:800,color:D.t1}}>{title}</span>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:D.t3}}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+const Lbl=({children})=><div style={{fontSize:11,fontWeight:700,color:D.t2,marginBottom:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>{children}</div>;
+function FInp({label,value,onChange,type="text",placeholder=""}){return<div style={{marginBottom:12}}>{label&&<Lbl>{label}</Lbl>}<input className="inp" type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/></div>;}
+function FTxt({label,value,onChange,rows=3}){return<div style={{marginBottom:12}}>{label&&<Lbl>{label}</Lbl>}<textarea className="inp" value={value} onChange={e=>onChange(e.target.value)} rows={rows} style={{resize:"vertical"}}/></div>;}
+function FSel({label,value,onChange,opts}){return<div style={{marginBottom:12}}>{label&&<Lbl>{label}</Lbl>}<select className="inp" style={{cursor:"pointer"}} value={value} onChange={e=>onChange(e.target.value)}>{opts.map(o=><option key={o.v||o} value={o.v||o}>{o.l||o}</option>)}</select></div>;}
+function TimePick({label,value,onChange}){
+  const slots=[];for(let h=0;h<24;h++)for(let m=0;m<60;m+=15){const hh=String(h).padStart(2,"0"),mm=String(m).padStart(2,"0");slots.push(`${hh}:${mm}`);}
+  return<div style={{marginBottom:12}}>{label&&<Lbl>{label}</Lbl>}<select className="inp" style={{cursor:"pointer"}} value={value||""} onChange={e=>onChange(e.target.value)}><option value="">—</option>{slots.map(s=>{const[h,m]=s.split(":").map(Number);const ap=h<12?"AM":"PM";const h12=h===0?12:h>12?h-12:h;return<option key={s} value={s}>{`${h12}:${String(m).padStart(2,"0")} ${ap}`}</option>;})}</select></div>;
+}
+function Attach({files=[],onChange}){
+  function add(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const n=[...files,{id:uid(),name:f.name,size:f.size,type:f.type,dataUrl:ev.target.result}];onChange(n);};r.readAsDataURL(f);}
+  const fmt=b=>b>1048576?(b/1048576).toFixed(1)+"MB":b>1024?(b/1024).toFixed(0)+"KB":b+"B";
+  return(
+    <div style={{marginBottom:12}}>
+      <Lbl>Attachments</Lbl>
+      {files.map(f=>(
+        <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:D.bg3,borderRadius:8,padding:"6px 10px",marginBottom:5,border:`1px solid ${D.bd}`}}>
+          <span style={{fontSize:12,color:D.t1}}>{f.type.startsWith("image/")?"🖼️":f.type.includes("pdf")?"📄":"📎"} {f.name} <span style={{color:D.t3}}>({fmt(f.size)})</span></span>
+          <div style={{display:"flex",gap:8}}>
+            {f.type.startsWith("image/")&&<a href={f.dataUrl} target="_blank" style={{fontSize:12,color:R.blue.t,fontWeight:600}}>View</a>}
+            <button onClick={()=>onChange(files.filter(x=>x.id!==f.id))} style={{background:"none",border:"none",cursor:"pointer",color:R.red.t,fontSize:13}}>🗑</button>
+          </div>
+        </div>
+      ))}
+      <label style={{display:"flex",alignItems:"center",gap:8,background:D.bg3,border:`1.5px dashed ${D.bd}`,borderRadius:9,padding:"7px 12px",cursor:"pointer",fontSize:13,color:D.t2}}>
+        📎 Add attachment<input type="file" onChange={add} style={{display:"none"}}/>
+      </label>
+    </div>
+  );
+}
+function CatPick({cats,deptIds,value,onChange}){
+  const depts=cats.filter(c=>deptIds.includes(c.id));
+  return<div style={{marginBottom:12}}><Lbl>Department</Lbl><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{depts.map(c=>{const r=ramp(c.ramp);return<button key={c.id} onClick={()=>onChange(c.id)} style={{background:value===c.id?r.bg:D.bg3,color:value===c.id?r.t:D.t3,border:`1.5px solid ${value===c.id?r.b:D.bd}`,borderRadius:9,padding:"5px 10px",cursor:"pointer",fontSize:12,fontWeight:700}}>{c.icon} {c.name}</button>;})}</div></div>;
+}
+function TagPick({cats,tagIds,value,onChange}){
+  const tags=cats.filter(c=>tagIds.includes(c.id));
+  return<div style={{marginBottom:12}}><Lbl>Tags</Lbl><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{tags.map(c=>{const sel=value.includes(c.id),r=ramp(c.ramp);return<button key={c.id} onClick={()=>onChange(sel?value.filter(x=>x!==c.id):[...value,c.id])} style={{background:sel?r.bg:D.bg3,color:sel?r.t:D.t3,border:`1.5px solid ${sel?r.b:D.bd}`,borderRadius:9,padding:"5px 10px",cursor:"pointer",fontSize:12,fontWeight:700}}>{c.icon} {c.name}</button>;})}</div></div>;
+}
+function MFSel({contacts,value,onChange}){
+  const mf=contacts.find(x=>x.id===value);
+  return<div style={{marginBottom:12}}><Lbl>Link master file</Lbl>
+    <select className="inp" style={{cursor:"pointer"}} value={value||""} onChange={e=>onChange(e.target.value?Number(e.target.value):null)}>
+      <option value="">— None —</option>{contacts.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+    </select>
+    {mf&&<div style={{marginTop:6,background:D.bg3,borderRadius:8,padding:"8px 12px",fontSize:12,color:D.t2}}>{mf.phone&&<div>📞 {mf.phone}</div>}{mf.email&&<div>✉️ {mf.email}</div>}{mf.address&&<div>📍 {mf.address}</div>}</div>}
+  </div>;
+}
+function TaskForm({initial,onSave,onCancel,contacts,cats,deptIds,tagIds,statuses}){
+  const bl={title:"",deptId:deptIds[0],flag:"work",type:"Task",priority:false,due:"",start:today(),notes:"",tags:[],status:"To Do",snoozedUntil:null,masterFileId:null,attachments:[]};
+  const[form,setF]=useState(initial||bl);
+  const f=(k,v)=>setF(p=>({...p,[k]:v}));
+  return<div>
+    <CatPick cats={cats} deptIds={deptIds} value={form.deptId} onChange={v=>f("deptId",v)}/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
+      <div style={{gridColumn:"1/-1"}}><FInp label="Title" value={form.title} onChange={v=>f("title",v)} placeholder="Task name"/></div>
+      <FSel label="Type" value={form.type} onChange={v=>f("type",v)} opts={TYPES}/>
+      <FSel label="Flag" value={form.flag} onChange={v=>f("flag",v)} opts={[{v:"work",l:"Work"},{v:"personal",l:"Personal"}]}/>
+      <FSel label="Status" value={form.status||"To Do"} onChange={v=>f("status",v)} opts={statuses.map(s=>s.name)}/>
+      <FSel label="Assignee" value={form.assignee||"You"} onChange={v=>f("assignee",v)} opts={["You"]}/>
+      <FInp label="Start" value={form.start} onChange={v=>f("start",v)} type="date"/>
+      <FInp label="Due"   value={form.due}   onChange={v=>f("due",v)}   type="date"/>
+    </div>
+    <TagPick cats={cats} tagIds={tagIds} value={form.tags||[]} onChange={v=>f("tags",v)}/>
+    <FTxt label="Notes" value={form.notes} onChange={v=>f("notes",v)}/>
+    <Attach files={form.attachments||[]} onChange={v=>f("attachments",v)}/>
+    {contacts&&contacts.length>0&&<MFSel contacts={contacts} value={form.masterFileId} onChange={v=>f("masterFileId",v)}/>}
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+      <input type="checkbox" id="prio" checked={!!form.priority} onChange={e=>f("priority",e.target.checked)}/>
+      <label htmlFor="prio" style={{fontSize:13,fontWeight:600,color:R.orange.t}}>🔴 Mark as priority</label>
+    </div>
+    <div style={{display:"flex",gap:10}}>
+      <Btn onClick={()=>onSave({...form,id:form.id||uid()})}>{initial?"Save changes":"Add task"}</Btn>
+      <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
+    </div>
+  </div>;
+}
+
+// ── Activity log ──────────────────────────────────────────────────────────────
+function useLog(){
+  const[log,setLog]=useState([{id:1,text:"App started",time:"now",icon:"⚡"}]);
+  const push=useCallback((text,icon="📝")=>setLog(p=>[{id:uid(),text,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),icon},...p].slice(0,30)),[]);
+  return[log,push];
+}
+
+// ── Greetings ─────────────────────────────────────────────────────────────────
+const GRS=["Let's get moving,","Ready to crush it,","Hey superstar,","Welcome back,","Rise & grind,","On a roll today,","Making it happen,","Look who showed up,","Big things incoming,","You got this,"];
+const GEM=["🚀","💪","⭐","👋","☕","🎯","⚡","😎","🔥","✨"];
+function DashGreeting(){
+  const[i]=useState(()=>Math.floor(Math.random()*GRS.length));
+  return<div style={{marginBottom:8,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+    <span style={{fontSize:36,fontWeight:800,fontFamily:"'Righteous',cursive",background:RB,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1.2}}>{GRS[i]} Ashley!</span>
+    <span style={{fontSize:32}}>{GEM[i]}</span>
+  </div>;
+}
+
+// ── Reminder Banner ───────────────────────────────────────────────────────────
+function RemBanner({tasks,setTasks,cats,logActivity}){
+  const active=tasks.filter(t=>t.priority&&t.status==="In Progress"&&!snoozed(t));
+  const[dismissed,setD]=useState(false);
+  if(!active.length||dismissed)return null;
+  function snz(id,days){setTasks(p=>p.map(t=>t.id===id?{...t,snoozedUntil:addD(today(),days)}:t));const t=tasks.find(x=>x.id===id);if(t)logActivity(`Snoozed "${t.title}" ${days}d`,"💤");}
+  return<div style={{background:R.orange.bg,border:`1.5px solid ${R.orange.b}`,borderRadius:13,padding:"12px 16px",marginBottom:18}}>
+    <div style={{display:"flex",justifyContent:"space-between"}}>
+      <div style={{fontSize:13,fontWeight:700,color:R.orange.t,marginBottom:8}}>🔔 {active.length} priority in-progress item{active.length>1?"s":""} need attention</div>
+      <button onClick={()=>setD(true)} style={{background:"none",border:"none",cursor:"pointer",color:D.t3,fontSize:16}}>×</button>
+    </div>
+    {active.slice(0,3).map(t=>(
+      <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+        <CatChip cats={cats} id={t.deptId}/>
+        <span style={{fontSize:13,color:R.orange.t,fontWeight:600,flex:1}}>{t.title}</span>
+        {t.due&&<span style={{fontSize:11,color:due(t.due)<0?R.red.t:D.t2}}>Due {fmtD(t.due)}</span>}
+        <span style={{fontSize:11,color:D.t3}}>Snooze:</span>
+        {[[7,"1wk"],[14,"2wks"],[28,"4wks"]].map(([d,l])=><button key={d} onClick={()=>snz(t.id,d)} style={{fontSize:11,background:D.bg3,border:`1px solid ${R.orange.b}`,borderRadius:6,padding:"2px 8px",cursor:"pointer",color:R.orange.t,fontWeight:600}}>{l}</button>)}
+      </div>
+    ))}
+  </div>;
+}
+
+// ── Stat cards ────────────────────────────────────────────────────────────────
+function StatCards({cards}){
+  return<div style={{display:"grid",gridTemplateColumns:`repeat(${cards.length},1fr)`,gap:10,marginBottom:20}}>
+    {cards.map(c=><div key={c.label} style={{background:c.r.bg,border:`1.5px solid ${c.r.b}`,borderRadius:13,padding:"13px 14px 10px"}}>
+      <div style={{fontSize:10,fontWeight:700,color:c.r.t,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:5,opacity:0.85}}>{c.label}</div>
+      <div style={{fontSize:28,fontWeight:800,color:c.r.h,lineHeight:1}}>{c.value}</div>
+    </div>)}
+  </div>;
+}
+
+// ── Dashboard panels (draggable) ──────────────────────────────────────────────
+function DashPanels({tasks,events,log,prios,upcoming,scount,cats,statuses}){
+  const PANELS=["status","activity","priority","upcoming"];
+  const[order,setOrder]=useState(PANELS);
+  const[dragId,setDragId]=useState(null);
+  const[overId,setOverId]=useState(null);
+  function drop(id){if(!dragId||dragId===id)return;setOrder(p=>{const a=[...p],fi=a.indexOf(dragId),ti=a.indexOf(id);a.splice(fi,1);a.splice(ti,0,dragId);return a;});setDragId(null);setOverId(null);}
+  const handle=<span style={{position:"absolute",top:9,right:11,fontSize:13,color:D.t3,opacity:0.4,cursor:"grab",userSelect:"none"}}>⠿</span>;
+  const base={background:D.bg2,borderRadius:14,padding:18,border:`1px solid ${D.bd}`,position:"relative"};
+  function panel(id){
+    if(id==="status")return<div style={base}>{handle}<div style={{fontSize:13,fontWeight:700,color:D.t1,marginBottom:12}}>📊 Status breakdown</div>
+      {scount.map(({s,count})=>{const r=ramp(s.ramp),pct=tasks.length?Math.round(count/tasks.length*100):0;return<div key={s.name} style={{marginBottom:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><span style={{fontSize:12,color:r.h,fontWeight:600}}>{s.icon} {s.name}</span><span style={{fontSize:12,color:D.t3}}>{count}</span></div>
+        <div style={{background:D.bg3,borderRadius:99,height:5}}><div style={{background:r.h,width:`${pct}%`,height:"100%",borderRadius:99}}/></div>
+      </div>;})}
+    </div>;
+    if(id==="activity")return<div style={base}>{handle}<div style={{fontSize:13,fontWeight:700,color:D.t1,marginBottom:12}}>🕐 Recent activity</div>
+      <div style={{maxHeight:190,overflowY:"auto"}}>{log.length===0?<div style={{color:D.t3,fontSize:13}}>No activity yet</div>:log.map(a=><div key={a.id} style={{display:"flex",gap:8,marginBottom:8,paddingBottom:8,borderBottom:`1px solid ${D.bg3}`}}><span style={{fontSize:14}}>{a.icon}</span><div><div style={{fontSize:12,color:D.t1}}>{a.text}</div><div style={{fontSize:10,color:D.t3}}>{a.time}</div></div></div>)}</div>
+    </div>;
+    if(id==="priority")return<div style={base}>{handle}<div style={{fontSize:13,fontWeight:700,color:R.red.t,marginBottom:12}}>🔴 Priority items</div>
+      {prios.length===0?<div style={{color:D.t3,fontSize:13}}>Nothing urgent 🎉</div>:prios.map(t=><div key={t.id} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid #48456A"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><CatChip cats={cats} id={t.deptId}/><span style={{fontSize:13,fontWeight:600,color:D.t1}}>{t.title}</span></div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><SBadge statuses={statuses} n={t.status}/>{t.due&&<span style={{fontSize:11,color:due(t.due)<0?R.red.t:D.t2}}>Due {fmtD(t.due)}</span>}{snoozed(t)&&<span style={{fontSize:11,color:D.t3}}>💤 until {fmtD(t.snoozedUntil)}</span>}</div>
+      </div>)}
+    </div>;
+    if(id==="upcoming")return<div style={base}>{handle}<div style={{fontSize:13,fontWeight:700,color:R.blue.t,marginBottom:12}}>📅 Upcoming 7 days</div>
+      {upcoming.length===0?<div style={{color:D.t3,fontSize:13}}>Clear schedule</div>:upcoming.map(e=><div key={e.id} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid #48456A",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><div style={{fontSize:13,fontWeight:600,color:D.t1}}>{e.title}</div><div style={{fontSize:11,color:D.t3,marginTop:2}}>{fmtD(e.date)}{e.time?` at ${e.time}`:""}</div></div>
+        <div style={{display:"flex",gap:4}}><FChip flag={e.flag}/><TChip type={e.type||"Meeting"}/></div>
+      </div>)}
+    </div>;
+    return null;
+  }
+  return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+    {order.map(id=><div key={id} draggable onDragStart={()=>setDragId(id)} onDragOver={e=>{e.preventDefault();setOverId(id);}} onDrop={()=>drop(id)} onDragEnd={()=>{setDragId(null);setOverId(null);}} style={{opacity:dragId===id?0.5:1,outline:overId===id&&dragId!==id?`2px solid ${R.indigo.h}`:"none",borderRadius:14}}>{panel(id)}</div>)}
+  </div>;
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function Dashboard({tasks,events,notes,ideas,setTasks,cats,statuses,log,logActivity}){
+  const prios=tasks.filter(t=>t.priority&&t.status!=="Complete");
+  const upcoming=events.filter(e=>due(e.date)>=0&&due(e.date)<=7);
+  const active=tasks.filter(t=>t.status==="In Progress");
+  const roadblocks=tasks.filter(t=>t.status==="Roadblock");
+  const scount=statuses.map(s=>({s,count:tasks.filter(t=>t.status===s.name).length}));
+  const cards=[
+    {label:"Active",       r:R.green, value:active.length},
+    {label:"Priority",     r:R.red,   value:prios.length},
+    {label:"Roadblocks",   r:R.pink,  value:roadblocks.length},
+    {label:"Due this week",r:R.orange,value:tasks.filter(t=>t.due&&due(t.due)<=7&&due(t.due)>=0&&t.status!=="Complete").length},
+    {label:"Notes",        r:R.blue,  value:notes.length},
+    {label:"Ideas",        r:R.violet,value:ideas.length},
+  ];
+  return<div style={{padding:"26px 0"}}>
+    <DashGreeting/>
+    <div style={{fontSize:14,color:D.t2,marginBottom:20}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</div>
+    <StatCards cards={cards}/>
+    <RemBanner tasks={tasks} setTasks={setTasks} cats={cats} logActivity={logActivity}/>
+    <DashPanels tasks={tasks} events={events} log={log} prios={prios} upcoming={upcoming} scount={scount} cats={cats} statuses={statuses}/>
+  </div>;
+}
+
+// ── Year view ─────────────────────────────────────────────────────────────────
+function YearView({events}){
+  const YR=new Date().getFullYear(),today_=new Date();
+  const evDates=new Set(events.map(e=>e.date));
+  const MC=["#FF4D4D","#FF6B6B","#FF8C42","#FFD600","#B8E04A","#3DCC7E","#2ECFD4","#4D9FFF","#7B6FFF","#9B5FFF","#CC55FF","#FF6EC7"];
+  const MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return<div>
+    <div style={{fontSize:13,fontWeight:700,color:D.t1,marginBottom:18,textAlign:"center",letterSpacing:"0.08em"}}>{YR} OVERVIEW — highlighted days have events</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(195px,1fr))",gap:14}}>
+      {MN.map((mn,mi)=>{
+        const col=MC[mi],fd=new Date(YR,mi,1).getDay(),dim=new Date(YR,mi+1,0).getDate(),isCur=today_.getMonth()===mi&&today_.getFullYear()===YR;
+        return<div key={mi} style={{background:D.bg2,borderRadius:13,padding:"13px 12px",border:`1.5px solid ${col}44`,borderTop:`3px solid ${col}`}}>
+          <div style={{fontSize:11,fontWeight:800,color:col,marginBottom:8,letterSpacing:"0.08em"}}>{mn.toUpperCase()}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:1,marginBottom:3}}>
+            {"SMTWTFS".split("").map(w=><div key={w} style={{fontSize:8,color:D.t3,textAlign:"center"}}>{w}</div>)}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:1}}>
+            {Array(fd).fill(null).map((_,i)=><div key={`e${i}`}/>)}
+            {Array(dim).fill(null).map((_,i)=>{
+              const d=i+1,ds=`${YR}-${String(mi+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+              const hasEv=evDates.has(ds),isTd=isCur&&d===today_.getDate();
+              return<div key={d} style={{aspectRatio:"1",borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:isTd?800:400,background:isTd?col:hasEv?col+"50":"transparent",color:isTd?"#fff":hasEv?col:D.t3,border:isTd?`1px solid ${col}`:hasEv?`1px solid ${col}77`:"none"}}>{d}</div>;
+            })}
+          </div>
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
+// ── Schedule view (habit-tracker notebook) ────────────────────────────────────
+function ScheduleView({filtered,contacts,openAdd,openEdit,delEvent}){
+  const today_=new Date();
+  const rows=Array.from({length:60},(_,i)=>{const d=new Date(today_);d.setDate(today_.getDate()+i);const ds=d.toISOString().slice(0,10);return{ds,d,evs:filtered.filter(e=>e.date===ds),isToday:i===0,dow:d.getDay()};});
+  const weeks=[];for(let i=0;i<rows.length;i+=7)weeks.push(rows.slice(i,i+7));
+  const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const ML=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return<div>
+    <div style={{display:"flex",gap:7,marginBottom:18,flexWrap:"wrap",alignItems:"center"}}>
+      <span style={{fontSize:11,fontWeight:700,color:D.t3,textTransform:"uppercase",letterSpacing:"0.06em",marginRight:4}}>Schedule</span>
+      {WD.map((d,i)=><span key={d} style={{fontSize:11,fontWeight:700,color:RC[i],background:RC[i]+"22",padding:"2px 9px",borderRadius:99}}>{d}</span>)}
+    </div>
+    {weeks.map((week,wi)=>{
+      const wlabel=[...new Set(week.map(r=>ML[r.d.getMonth()].slice(0,3)))].join("/");
+      const evRows=week.filter(r=>r.evs.length>0).flatMap(r=>r.evs.map(e=>({...e,r})));
+      return<div key={wi} style={{marginBottom:5,borderRadius:12,overflow:"hidden",border:`1px solid ${D.bd}`}}>
+        <div style={{display:"grid",gridTemplateColumns:"44px repeat(7,1fr)"}}>
+          <div style={{background:D.bg1,display:"flex",alignItems:"center",justifyContent:"center",borderRight:`1px solid ${D.bd}`,padding:"3px"}}>
+            <span style={{fontSize:7,fontWeight:700,color:D.t3,textTransform:"uppercase",writingMode:"vertical-rl",transform:"rotate(180deg)",letterSpacing:"0.04em"}}>{wlabel}</span>
+          </div>
+          {week.map(r=>{
+            const c=RC[r.dow];
+            return<div key={r.ds} style={{background:r.isToday?c+"33":r.evs.length>0?c+"18":D.bg2,borderLeft:`1px solid ${D.bd}`,padding:"4px 3px",textAlign:"center",borderBottom:`2px solid ${r.isToday?c:r.evs.length>0?c+"77":"transparent"}`}}>
+              <div style={{fontSize:7,fontWeight:700,color:r.isToday?c:D.t3,textTransform:"uppercase"}}>{WD[r.dow]}</div>
+              <div style={{fontSize:15,fontWeight:800,color:r.isToday?c:r.evs.length>0?c:D.t1,lineHeight:1}}>{r.d.getDate()}</div>
+              {r.evs.length>0&&<div style={{width:5,height:5,borderRadius:99,background:c,margin:"1px auto 0"}}/>}
+            </div>;
+          })}
+        </div>
+        <div style={{background:D.bg2}}>
+          {evRows.map(e=>{
+            const c=RC[e.r.dow],tm=TM[e.type||"Meeting"]||TM.Meeting,mf=contacts.find(x=>x.id===e.masterFileId);
+            const ts=e.time?(()=>{const[h,m]=e.time.split(":").map(Number);const ap=h<12?"AM":"PM";const h12=h===0?12:h>12?h-12:h;return`${h12}:${String(m).padStart(2,"0")} ${ap}`;})():"";
+            return<div key={e.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px 6px 12px",borderBottom:`1px solid ${D.bd}33`,borderLeft:`3px solid ${c}`}}>
+              <span style={{fontSize:9,fontWeight:700,color:c,minWidth:24}}>{WD[e.r.dow]}</span>
+              {ts&&<span style={{fontSize:11,fontWeight:700,color:tm.t,minWidth:58,flexShrink:0}}>{ts}</span>}
+              <span style={{fontSize:13,fontWeight:700,color:D.t1,flex:1}}>{e.title}</span>
+              <TChip type={e.type||"Meeting"}/>
+              {mf&&<span style={{fontSize:11,color:R.indigo.t}}>📎 {mf.name}</span>}
+              <button onClick={()=>openEdit(e)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:D.t3,opacity:0.7}}>✏️</button>
+              <button onClick={()=>delEvent(e.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:R.red.t,opacity:0.6}}>🗑</button>
+            </div>;
+          })}
+          <div style={{padding:"3px 10px 5px"}}><button onClick={()=>openAdd(week[0].ds)} style={{fontSize:11,color:D.t3,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",opacity:0.7}}>＋ Add to week</button></div>
+        </div>
+      </div>;
+    })}
+  </div>;
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+function CalendarView({events,setEvents,contacts,logActivity}){
+  const now=new Date();
+  const[calView,setCalView]=useState("month");
+  const[cur,setCur]=useState(new Date(now.getFullYear(),now.getMonth(),1));
+  const[showAdd,setShowAdd]=useState(false);
+  const[editing,setEditing]=useState(null);
+  const[detail,setDetail]=useState(null);
+  const[flagF,setFlagF]=useState("all");
+  const[typeF,setTypeF]=useState("all");
+  const blank={title:"",date:today(),time:"",flag:"work",contact:"",type:"Meeting",masterFileId:null};
+  const[form,setForm]=useState(blank);
+  const y=cur.getFullYear(),mo=cur.getMonth();
+  const fd=new Date(y,mo,1).getDay(),dim=new Date(y,mo+1,0).getDate();
+  const filtered=events.filter(e=>flagF==="all"||e.flag===flagF).filter(e=>typeF==="all"||e.type===typeF);
+  const byDate={};filtered.forEach(e=>{if(!byDate[e.date])byDate[e.date]=[];byDate[e.date].push(e);});
+  function cell(d){return`${y}-${String(mo+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;}
+  function openAdd(ds){setForm({...blank,date:ds||today()});setEditing(null);setShowAdd(true);}
+  function openEdit(ev){setForm({...ev});setEditing(ev);setShowAdd(true);}
+  function saveEv(){if(!form.title.trim())return;if(editing){setEvents(p=>p.map(e=>e.id===editing.id?{...form,id:editing.id}:e));logActivity(`Updated event "${form.title}"`,"✏️");}else{setEvents(p=>[...p,{...form,id:uid()}]);logActivity(`Added event "${form.title}"`,"📅");}setForm(blank);setEditing(null);setShowAdd(false);}
+  function delEv(id){setEvents(p=>p.filter(e=>e.id!==id));}
+  const FB=(active,label,onClick)=><button onClick={onClick} style={{padding:"5px 12px",borderRadius:99,fontSize:12,fontWeight:600,border:"1.5px solid",cursor:"pointer",background:active?R.indigo.h:D.bg3,color:active?"#fff":D.t2,borderColor:active?R.indigo.h:D.bd}}>{label}</button>;
+  const TD_=today();
+  // Rainbow grid colours by day-of-week
+  const COL_BG=["rgba(255,77,77,0.08)","rgba(255,140,66,0.08)","rgba(255,214,0,0.08)","rgba(61,204,126,0.08)","rgba(77,159,255,0.08)","rgba(123,111,255,0.08)","rgba(204,85,255,0.08)"];
+  return<div style={{padding:"24px 0"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
+      <div style={{fontSize:22,fontWeight:800,color:D.t1}}>Calendar</div>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{display:"flex",gap:3,background:D.bg2,borderRadius:10,padding:3,border:`1px solid ${D.bd}`}}>
+          {[{id:"month",l:"📅 Month"},{id:"schedule",l:"📋 Schedule"},{id:"year",l:"🗓 Year"}].map(v=><button key={v.id} onClick={()=>setCalView(v.id)} style={{padding:"5px 12px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:calView===v.id?R.indigo.bg:"transparent",color:calView===v.id?R.indigo.t:D.t3}}>{v.l}</button>)}
+        </div>
+        <Btn onClick={()=>openAdd(null)}>＋ Add event</Btn>
+      </div>
+    </div>
+    {calView==="year"&&<YearView events={events}/>}
+    {calView==="schedule"&&<ScheduleView filtered={filtered} contacts={contacts} openAdd={openAdd} openEdit={openEdit} delEvent={delEv}/>}
+    {calView==="month"&&<div>
+      {/* Filters */}
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:10,color:D.t3,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:5}}>Flag</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>{FB(flagF==="all","All",()=>setFlagF("all"))}{FB(flagF==="work","💼 Work",()=>setFlagF("work"))}{FB(flagF==="personal","🏠 Personal",()=>setFlagF("personal"))}</div>
+        <div style={{fontSize:10,color:D.t3,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:5}}>Type</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{FB(typeF==="all","All",()=>setTypeF("all"))}{TYPES.map(t=>FB(typeF===t,`${(TM[t]||TM.Task).icon} ${t}`,()=>setTypeF(t)))}</div>
+      </div>
+      {/* Month nav */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,marginTop:14}}>
+        <button onClick={()=>setCur(new Date(y,mo-1))} style={{background:D.bg3,border:`1px solid ${D.bd}`,borderRadius:9,padding:"6px 13px",cursor:"pointer",fontSize:16,color:R.indigo.t}}>‹</button>
+        <div style={{fontSize:16,fontWeight:700,color:D.t1}}>{cur.toLocaleString("default",{month:"long"})} {y}</div>
+        <button onClick={()=>setCur(new Date(y,mo+1))} style={{background:D.bg3,border:`1px solid ${D.bd}`,borderRadius:9,padding:"6px 13px",cursor:"pointer",fontSize:16,color:R.indigo.t}}>›</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2}}>
+        {["Su","Mo","Tu","We","Th","Fr","Sa"].map((d,i)=><div key={d} style={{textAlign:"center",fontSize:10,fontWeight:700,color:RC[i],padding:"2px 0",textTransform:"uppercase"}}>{d}</div>)}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+        {Array(fd).fill(null).map((_,i)=><div key={`e${i}`}/>)}
+        {Array(dim).fill(null).map((_,i)=>{
+          const d=i+1,ds=cell(d),evs=byDate[ds]||[];
+          const isToday_=ds===TD_,isSel=detail===ds,dow=new Date(y,mo,d).getDay(),c=RC[dow];
+          return<div key={d} onClick={()=>setDetail(isSel?null:ds)}
+            style={{background:isSel?"rgba(123,111,255,0.18)":isToday_?c+"25":COL_BG[dow],borderRadius:9,padding:"6px 5px",minHeight:68,border:`1.5px solid ${isToday_?c:isSel?R.indigo.h:c+"55"}`,cursor:"pointer"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=c} onMouseLeave={e=>e.currentTarget.style.borderColor=isToday_?c:isSel?R.indigo.h:c+"55"}>
+            <div style={{fontSize:11,fontWeight:isToday_?800:600,color:isToday_?c:c+"CC",marginBottom:3}}>{d}</div>
+            {evs.slice(0,2).map(e=>{const tm=TM[e.type||"Meeting"]||TM.Task;return<div key={e.id} style={{background:tm.bg,color:tm.t,fontSize:9,fontWeight:700,padding:"2px 4px",borderRadius:4,marginBottom:2,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",border:`1px solid ${tm.b}`}}>{tm.icon} {e.title}</div>;})}
+            {evs.length>2&&<div style={{fontSize:9,color:D.t3}}>+{evs.length-2}</div>}
+          </div>;
+        })}
+      </div>
+      {/* Day detail */}
+      {detail&&(byDate[detail]||[]).length>0&&<div style={{marginTop:14,background:D.bg2,borderRadius:13,padding:16,border:`1px solid ${D.bd}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:700,color:D.t1}}>{fmtD(detail)}</div>
+          <Btn sm onClick={()=>openAdd(detail)}>＋ Add</Btn>
+        </div>
+        {(byDate[detail]||[]).map(e=>{const mf=contacts.find(c=>c.id===e.masterFileId);return(
+          <div key={e.id} style={{padding:"10px 0",borderBottom:`1px solid ${D.bg3}`,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:700,color:D.t1,marginBottom:4}}>{e.title}</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}><TChip type={e.type||"Meeting"}/><FChip flag={e.flag}/>{e.time&&<span style={{fontSize:11,color:D.t2}}>🕐 {e.time}</span>}{e.contact&&!mf&&<span style={{fontSize:11,color:D.t2}}>With: {e.contact}</span>}</div>
+              {mf&&<div style={{marginTop:6,background:D.bg3,borderRadius:8,padding:"8px 11px",border:`1px solid ${D.bd}`}}><div style={{fontSize:11,fontWeight:700,color:R.indigo.t,marginBottom:3}}>📎 {mf.name}</div><div style={{fontSize:11,color:D.t2}}>{mf.phone&&`📞 ${mf.phone} `}{mf.address&&`📍 ${mf.address}`}</div></div>}
+            </div>
+            <div style={{display:"flex",gap:6,flexShrink:0,marginLeft:8}}>
+              <button onClick={()=>openEdit(e)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:R.blue.t,opacity:0.8}}>✏️</button>
+              <button onClick={()=>delEv(e.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:R.red.t,opacity:0.7}}>🗑</button>
+            </div>
+          </div>
+        );})}
+      </div>}
+    </div>}
+    {showAdd&&<Modal title={editing?"Edit event":"New event"} onClose={()=>{setShowAdd(false);setEditing(null);}}>
+      <FInp label="Title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="Event name"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
+        <FInp label="Date" value={form.date} onChange={v=>setForm(f=>({...f,date:v}))} type="date"/>
+        <TimePick label="Time" value={form.time} onChange={v=>setForm(f=>({...f,time:v}))}/>
+        <FSel label="Type" value={form.type||"Meeting"} onChange={v=>setForm(f=>({...f,type:v}))} opts={TYPES}/>
+        <FSel label="Flag" value={form.flag} onChange={v=>setForm(f=>({...f,flag:v}))} opts={[{v:"work",l:"Work"},{v:"personal",l:"Personal"}]}/>
+      </div>
+      <MFSel contacts={contacts} value={form.masterFileId} onChange={v=>setForm(f=>({...f,masterFileId:v,contact:v?(contacts.find(c=>c.id===v)||{}).name||"":f.contact}))}/>
+      {!form.masterFileId&&<FInp label="Contact / With" value={form.contact} onChange={v=>setForm(f=>({...f,contact:v}))} placeholder="Name or org"/>}
+      <div style={{display:"flex",gap:10}}><Btn onClick={saveEv}>{editing?"Save changes":"Add event"}</Btn><Btn variant="ghost" onClick={()=>{setShowAdd(false);setEditing(null);}}>Cancel</Btn></div>
+    </Modal>}
+  </div>;
+}
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+function ListView({tasks,cats,statuses,onEdit}){
+  const[sort,setSort]=useState({k:"due",d:1});
+  function tog(k){setSort(s=>s.k===k?{k,d:s.d*-1}:{k,d:1});}
+  const si=k=>sort.k===k?(sort.d===1?" ↑":" ↓"):"";
+  const rows=[...tasks].sort((a,b)=>{const d=sort.d;if(sort.k==="due")return((a.due||"9999")<(b.due||"9999")?-1:1)*d;if(sort.k==="title")return a.title.localeCompare(b.title)*d;if(sort.k==="status")return a.status.localeCompare(b.status)*d;if(sort.k==="dept")return(a.deptId||"").localeCompare(b.deptId||"")*d;return 0;});
+  const th={padding:"6px 10px",fontSize:10,fontWeight:700,color:D.t3,textTransform:"uppercase",letterSpacing:"0.06em",cursor:"pointer",whiteSpace:"nowrap",background:D.bg1};
+  const td={padding:"7px 10px",fontSize:12,color:D.t1,borderBottom:`1px solid ${D.bg3}`};
+  return<div style={{overflowX:"auto"}}>
+    <table style={{width:"100%",borderCollapse:"collapse",background:D.bg2,borderRadius:13,overflow:"hidden",border:`1px solid ${D.bd}`}}>
+      <thead><tr>
+        {[["",""],["Title","title"],["Dept","dept"],["Type",""],["Status","status"],["Flag",""],["Due","due"],["Pri",""],[""]].map(([h,k],i)=><th key={i} style={th} onClick={()=>k&&tog(k)}>{h}{k&&si(k)}</th>)}
+      </tr></thead>
+      <tbody>{rows.map(t=>{const c=cat(cats,t.deptId),r=ramp(c.ramp);return<tr key={t.id} onMouseEnter={e=>e.currentTarget.style.background=D.bg3} onMouseLeave={e=>e.currentTarget.style.background=""}>
+        <td style={{...td,width:28,textAlign:"center"}}><span style={{fontSize:15}}>{c.icon}</span></td>
+        <td style={{...td,fontWeight:600,maxWidth:170}}>{t.title}</td>
+        <td style={td}><CatChip cats={cats} id={t.deptId}/></td>
+        <td style={td}><TChip type={t.type||"Task"}/></td>
+        <td style={td}><SBadge statuses={statuses} n={t.status}/></td>
+        <td style={td}><FChip flag={t.flag}/></td>
+        <td style={{...td,whiteSpace:"nowrap",color:due(t.due)<0?R.red.t:due(t.due)<=3?R.orange.t:D.t2}}>{fmtD(t.due)}</td>
+        <td style={{...td,textAlign:"center"}}>{t.priority?"🔴":""}</td>
+        <td style={{...td,whiteSpace:"nowrap"}}><button onClick={()=>onEdit(t)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:R.indigo.t,fontWeight:700}}>Edit</button></td>
+      </tr>;})}
+      </tbody>
+    </table>
+  </div>;
+}
+function TableView({tasks,cats,statuses,setTasks}){
+  const depts=[...new Set(tasks.map(t=>t.deptId))];
+  const th={padding:"6px 12px",fontSize:10,fontWeight:700,color:D.t3,textTransform:"uppercase",letterSpacing:"0.06em",background:D.bg1};
+  return<div>
+    <div style={{display:"grid",gridTemplateColumns:"4px 1fr 90px 100px 80px 85px",background:D.bg1,borderRadius:"10px 10px 0 0",border:`1px solid ${D.bd}`,borderBottom:"none",overflow:"hidden"}}>
+      <div style={{background:D.bg3}}/>{["Task","Type","Status","Due","Change status"].map(h=><div key={h} style={th}>{h}</div>)}
+    </div>
+    {depts.map(deptId=>{
+      const pt=tasks.filter(t=>t.deptId===deptId),c=cat(cats,deptId),r=ramp(c.ramp);
+      return<div key={deptId} style={{marginBottom:14}}>
+        <div style={{background:r.bg,borderLeft:`4px solid ${r.h}`,padding:"6px 13px",display:"flex",alignItems:"center",gap:9,border:`1px solid ${r.b}`,borderTop:`1px solid ${r.b}`}}>
+          <span style={{fontSize:15}}>{c.icon}</span><span style={{fontSize:12,fontWeight:700,color:r.t,letterSpacing:"0.05em"}}>{c.name}</span>
+          <span style={{fontSize:11,color:r.t,opacity:0.6}}>{pt.length} task{pt.length!==1?"s":""}</span>
+        </div>
+        {pt.map(t=>{const sM=sname(statuses,t.status),sR=ramp(sM.ramp);return(
+          <div key={t.id} style={{display:"grid",gridTemplateColumns:"4px 1fr 90px 100px 80px 85px",alignItems:"center",borderBottom:`1px solid ${D.bg3}`,background:D.bg2,border:`1px solid ${D.bd}`,borderTop:"none",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=D.bg3} onMouseLeave={e=>e.currentTarget.style.background=D.bg2}>
+            <div style={{alignSelf:"stretch",background:r.h,opacity:0.7}}/>
+            <div style={{padding:"7px 12px"}}>
+              <div style={{fontSize:12,fontWeight:800,color:D.t1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{t.title}</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}><FChip flag={t.flag}/>{t.priority&&<PBadge/>}{(t.tags||[]).map(tid=><TagPip key={tid} cats={cats} id={tid}/>)}</div>
+            </div>
+            <div style={{padding:"7px 8px"}}><TChip type={t.type||"Task"}/></div>
+            <div style={{padding:"7px 8px"}}><SBadge statuses={statuses} n={t.status}/></div>
+            <div style={{padding:"7px 8px",fontSize:11,color:due(t.due)<0?R.red.t:due(t.due)<=3?R.orange.t:D.t2,whiteSpace:"nowrap"}}>{fmtD(t.due)}</div>
+            <div style={{padding:"7px 8px"}} onClick={e=>e.stopPropagation()}>
+              <select value={t.status} onChange={e=>setTasks(p=>p.map(x=>x.id===t.id?{...x,status:e.target.value}:x))} style={{fontSize:11,padding:"3px 6px",borderRadius:7,border:`1px solid ${sR.b}`,color:sR.h,background:sR.bg,fontFamily:"inherit",cursor:"pointer",width:"100%"}}>{statuses.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select>
+            </div>
+          </div>
+        );})}
+      </div>;
+    })}
+  </div>;
+}
+function GanttView({tasks,cats,statuses}){
+  const START=mkD(-17),DAYS=60,DW=26,RH=38,LW=190;
+  function off(d){return Math.max(0,Math.round((new Date(d)-new Date(START))/86400000));}
+  const tOff=off(today());
+  const months=[];let dd=new Date(START);for(let i=0;i<DAYS;i++){if(dd.getDate()===1||i===0)months.push({label:dd.toLocaleString("default",{month:"short"})+" "+dd.getFullYear(),o:i});dd.setDate(dd.getDate()+1);}
+  return<div style={{overflowX:"auto"}}>
+    <div style={{minWidth:LW+DAYS*DW}}>
+      <div style={{display:"flex",borderBottom:`1px solid ${D.bd}`,paddingBottom:4,marginBottom:2}}>
+        <div style={{width:LW,flexShrink:0,fontSize:11,color:D.t3,paddingLeft:8,fontWeight:700}}>Task</div>
+        <div style={{position:"relative",width:DAYS*DW,flexShrink:0}}>
+          {months.map((m,i)=><div key={i} style={{position:"absolute",left:m.o*DW,fontSize:10,fontWeight:700,color:R.indigo.t,top:0}}>{m.label}</div>)}
+          <div style={{display:"flex",marginTop:16}}>{Array(DAYS).fill(0).map((_,i)=>{const d=new Date(START);d.setDate(d.getDate()+i);const wk=d.getDay()===0||d.getDay()===6;return<div key={i} style={{width:DW,flexShrink:0,fontSize:9,color:i===tOff?R.violet.h:wk?D.bd:D.t3,textAlign:"center",borderRight:`1px solid ${D.bg3}`,background:i===tOff?"rgba(123,111,255,0.1)":wk?"rgba(255,255,255,0.02)":"transparent"}}>{d.getDate()}</div>;})}</div>
+        </div>
+      </div>
+      {tasks.filter(t=>t.start&&t.due).map((t,idx)=>{const c=cat(cats,t.deptId),r=ramp(c.ramp),o=off(t.start),w=Math.max(1,off(t.due)-o);return(
+        <div key={t.id} style={{display:"flex",alignItems:"center",height:RH,borderBottom:`1px solid ${D.bg3}`,background:idx%2===0?D.bg2:D.bg1}}>
+          <div style={{width:LW,flexShrink:0,fontSize:12,fontWeight:600,color:D.t1,paddingLeft:8,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}><span style={{color:r.h}}>{c.icon}</span><span style={{overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</span></div>
+          <div style={{position:"relative",width:DAYS*DW,height:RH,flexShrink:0}}>
+            <div style={{position:"absolute",left:tOff*DW+DW/2,top:0,width:2,height:RH,background:R.violet.h,opacity:0.5}}/>
+            <div style={{position:"absolute",left:o*DW+2,top:9,height:20,width:Math.max(16,w*DW-4),background:r.bg,border:`1.5px solid ${r.b}`,borderRadius:6,display:"flex",alignItems:"center",paddingLeft:6,overflow:"hidden",boxSizing:"border-box"}}><span style={{fontSize:10,fontWeight:700,color:r.t,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</span></div>
+          </div>
+        </div>
+      );})}
+    </div>
+  </div>;
+}
+function Projects({tasks,setTasks,contacts,cats,deptIds,tagIds,statuses,logActivity}){
+  const[view,setView]=useState("kanban");
+  const[showAdd,setShowAdd]=useState(false);
+  const[editing,setEditing]=useState(null);
+  const[promoted,setPromoted]=useState(null);
+  const[dragId,setDragId]=useState(null);
+  const[dragOver,setDragOver]=useState(null);
+  const[search,setSearch]=useState("");
+  const[fDept,setFDept]=useState("all");
+  const[fType,setFType]=useState("all");
+  const[fTag,setFTag]=useState("all");
+  const[fQuick,setFQuick]=useState("all");
+  const TD_=today();
+  const deptCats=cats.filter(c=>deptIds.includes(c.id)),tagCats=cats.filter(c=>tagIds.includes(c.id));
+  const filtered=tasks.filter(t=>fDept==="all"||t.deptId===fDept).filter(t=>fType==="all"||t.type===fType).filter(t=>fTag==="all"||(t.tags||[]).includes(fTag)).filter(t=>!search||t.title.toLowerCase().includes(search.toLowerCase())).filter(t=>{if(fQuick==="prio")return t.priority&&t.status!=="Complete";if(fQuick==="overdue")return t.due&&t.due<TD_&&t.status!=="Complete";if(fQuick==="both")return(t.priority||( t.due&&t.due<TD_))&&t.status!=="Complete";return true;});
+  function save(task){setTasks(p=>{const ex=p.find(t=>t.id===task.id);if(ex){logActivity(`Updated "${task.title}"`,"✏️");return p.map(t=>t.id===task.id?task:t);}logActivity(`Added "${task.title}"`,"➕");return[...p,task];});setShowAdd(false);setEditing(null);}
+  function del(id){const t=tasks.find(x=>x.id===id);if(t)logActivity(`Deleted "${t.title}"`,"🗑");setTasks(p=>p.filter(t=>t.id!==id));setEditing(null);}
+  function updS(id,status){const t=tasks.find(x=>x.id===id);if(t&&t.status!==status)logActivity(`Moved "${t.title}" → ${status}`,"🔀");setTasks(p=>p.map(t=>t.id===id?{...t,status}:t));}
+  return<div style={{padding:"24px 0"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+      <div style={{fontSize:22,fontWeight:800,color:D.t1}}>Projects & Tasks</div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <div style={{display:"flex",gap:3,background:D.bg2,borderRadius:10,padding:3,border:`1px solid ${D.bd}`}}>
+          {[{id:"kanban",l:"⊞"},{id:"list",l:"☰"},{id:"table",l:"⊟"},{id:"gantt",l:"▬"}].map(v=><button key={v.id} onClick={()=>setView(v.id)} style={{padding:"5px 12px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:600,background:view===v.id?R.indigo.bg:"transparent",color:view===v.id?R.indigo.t:D.t3}}>{v.l}</button>)}
+        </div>
+        <Btn onClick={()=>setShowAdd(true)}>＋ Add task</Btn>
+      </div>
+    </div>
+    {/* Filters */}
+    <div style={{display:"flex",gap:7,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search…" style={{...{padding:"7px 12px",borderRadius:9,border:`1.5px solid ${D.bd}`,fontSize:13,outline:"none",background:D.bg3,color:D.t1},flex:1,minWidth:150}}/>
+      <select value={fDept} onChange={e=>setFDept(e.target.value)} style={{padding:"7px 10px",borderRadius:9,border:`1.5px solid ${D.bd}`,fontSize:13,background:D.bg3,color:D.t1,cursor:"pointer"}}>
+        <option value="all">All depts</option>{deptCats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+      </select>
+      <select value={fType} onChange={e=>setFType(e.target.value)} style={{padding:"7px 10px",borderRadius:9,border:`1.5px solid ${D.bd}`,fontSize:13,background:D.bg3,color:D.t1,cursor:"pointer"}}>
+        <option value="all">All types</option>{TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+      </select>
+      <select value={fTag} onChange={e=>setFTag(e.target.value)} style={{padding:"7px 10px",borderRadius:9,border:`1.5px solid ${D.bd}`,fontSize:13,background:D.bg3,color:D.t1,cursor:"pointer"}}>
+        <option value="all">All tags</option>{tagCats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+      </select>
+    </div>
+    <div style={{display:"flex",gap:7,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+      {[{id:"all",l:"All tasks"},{id:"prio",l:"🔴 Priority"},{id:"overdue",l:"⏰ Overdue"},{id:"both",l:"🔴⏰ Both"}].map(o=><button key={o.id} onClick={()=>setFQuick(o.id)} style={{padding:"4px 12px",borderRadius:99,fontSize:12,fontWeight:600,border:"1.5px solid",cursor:"pointer",background:fQuick===o.id?R.indigo.h:D.bg3,color:fQuick===o.id?"#fff":D.t2,borderColor:fQuick===o.id?R.indigo.h:D.bd}}>{o.l}</button>)}
+      <span style={{fontSize:12,color:D.t3,marginLeft:"auto"}}>{filtered.length} tasks</span>
+    </div>
+    {/* Kanban */}
+    {view==="kanban"&&<div style={{display:"grid",gridTemplateColumns:`repeat(${statuses.length},1fr)`,gap:10}}>
+      {statuses.map(sObj=>{const col=filtered.filter(t=>t.status===sObj.name),r=ramp(sObj.ramp);return(
+        <div key={sObj.id} style={{background:D.bg2,borderRadius:13,padding:"12px 10px",border:`1.5px solid ${dragOver===sObj.name?r.h:D.bd}`,transition:"border-color 0.2s",minWidth:0}}
+          onDragOver={e=>{e.preventDefault();setDragOver(sObj.name);}} onDrop={()=>{if(dragId)updS(dragId,sObj.name);setDragId(null);setDragOver(null);}} onDragLeave={()=>setDragOver(null)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <span style={{fontSize:14,fontWeight:800,color:r.h,letterSpacing:"0.02em"}}>{sObj.icon} {sObj.name}</span>
+            <span style={{fontSize:12,background:r.bg,color:r.h,padding:"2px 8px",borderRadius:99,fontWeight:800,border:`1px solid ${r.b}`}}>{col.length}</span>
+          </div>
+          {col.map(t=>{const c=cat(cats,t.deptId),cr=ramp(c.ramp);return(
+            <div key={t.id} draggable onDragStart={()=>setDragId(t.id)} onClick={()=>setEditing(t)}
+              style={{background:D.bg3,borderRadius:10,padding:"10px 11px",marginBottom:8,border:`1.5px solid ${cr.b}`,cursor:"grab",transition:"all 0.15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=cr.h;e.currentTarget.style.background="#1E1E35";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=cr.b;e.currentTarget.style.background=D.bg3;}}>
+              <div style={{marginBottom:4}}><CatChip cats={cats} id={t.deptId}/></div>
+              <div style={{fontSize:12,fontWeight:800,color:D.t1,lineHeight:1.4,marginBottom:4}}>{t.title}</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:3}}><TChip type={t.type||"Task"}/><FChip flag={t.flag}/>{t.priority&&<PBadge/>}</div>
+              <div style={{display:"flex",gap:3,flexWrap:"wrap",marginBottom:t.due?3:0}}>{(t.tags||[]).map(tid=><TagPip key={tid} cats={cats} id={tid}/>)}</div>
+              {t.due&&<div style={{fontSize:10,color:due(t.due)<0?R.red.t:due(t.due)<=3?R.orange.t:D.t3}}>📅 {fmtD(t.due)}{due(t.due)<0?" — overdue":""}</div>}
+            </div>
+          );})}
+          {col.length===0&&<div style={{fontSize:11,color:D.t3,textAlign:"center",padding:"12px 0",border:`1px dashed ${D.bd}`,borderRadius:9}}>Drop here</div>}
+        </div>
+      );})}
+    </div>}
+    {view==="list" &&<ListView  tasks={filtered} cats={cats} statuses={statuses} onEdit={setEditing}/>}
+    {view==="table"&&<TableView tasks={filtered} cats={cats} statuses={statuses} setTasks={setTasks}/>}
+    {view==="gantt"&&<GanttView tasks={filtered} cats={cats} statuses={statuses}/>}
+    {showAdd&&<Modal title="New task" onClose={()=>setShowAdd(false)} wide><TaskForm onSave={save} onCancel={()=>setShowAdd(false)} contacts={contacts} cats={cats} deptIds={deptIds} tagIds={tagIds} statuses={statuses}/></Modal>}
+    {editing&&<Modal title="Edit task" onClose={()=>setEditing(null)} wide><TaskForm initial={editing} onSave={save} onCancel={()=>setEditing(null)} contacts={contacts} cats={cats} deptIds={deptIds} tagIds={tagIds} statuses={statuses}/><div style={{marginTop:8}}><Btn variant="danger" sm onClick={()=>del(editing.id)}>🗑 Delete</Btn></div></Modal>}
+    {promoted&&<Modal title="Edit promoted task" onClose={()=>setPromoted(null)} wide>
+      <div style={{background:R.green.bg,border:`1px solid ${R.green.b}`,borderRadius:9,padding:"9px 13px",marginBottom:14,fontSize:13,color:R.green.t}}>✅ Promoted! Fill in the department and tags.</div>
+      <TaskForm initial={promoted} onSave={t=>{setTasks(p=>p.map(x=>x.id===t.id?t:x));setPromoted(null);}} onCancel={()=>setPromoted(null)} contacts={contacts} cats={cats} deptIds={deptIds} tagIds={tagIds} statuses={statuses}/>
+    </Modal>}
+  </div>;
+}
+
+// ── Notes ─────────────────────────────────────────────────────────────────────
+function Notes({notes,setNotes,cats,tagIds,logActivity,folder}){
+  const[showAdd,setShowAdd]=useState(false);
+  const[editing,setEditing]=useState(null);
+  const[form,setForm]=useState({title:"",content:"",tags:[],pinned:false,folder,attachments:[]});
+  const[search,setSearch]=useState("");
+  const f_=(k,v)=>setForm(p=>({...p,[k]:v}));
+  useEffect(()=>{setForm(p=>({...p,folder}));},[folder]);
+  function save(){if(!form.title.trim())return;if(editing){setNotes(p=>p.map(n=>n.id===editing.id?{...n,...form}:n));logActivity(`Updated note "${form.title}"`,"📝");}else{setNotes(p=>[...p,{...form,id:uid(),created:today()}]);logActivity(`Added note "${form.title}"`,"📝");}setShowAdd(false);setEditing(null);}
+  function openEdit(n){setForm({...n});setEditing(n);setShowAdd(true);}
+  const inFolder=notes.filter(n=>(n.folder||"work")===folder);
+  const filtered_=inFolder.filter(n=>!search||n.title.toLowerCase().includes(search.toLowerCase())||n.content.toLowerCase().includes(search.toLowerCase()));
+  const pinned=filtered_.filter(n=>n.pinned),rest=filtered_.filter(n=>!n.pinned);
+  const RAMPS=[R.blue,R.violet,R.green,R.orange,R.red,R.yellow,R.indigo];
+  return<div style={{padding:"24px 0"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+      <div style={{fontSize:22,fontWeight:800,color:D.t1}}>Notes — {folder==="work"?"💼 Work":"🏠 Personal"}</div>
+      <Btn onClick={()=>{setForm({title:"",content:"",tags:[],pinned:false,folder,attachments:[]});setEditing(null);setShowAdd(true);}}>＋ New note</Btn>
+    </div>
+    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search notes…" className="inp" style={{marginBottom:16}}/>
+    {pinned.length>0&&<div style={{fontSize:10,fontWeight:700,color:D.t3,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:10}}>📌 Pinned</div>}
+    {filtered_.length===0&&<div style={{textAlign:"center",padding:32,color:D.t3,fontSize:14}}>No notes here yet</div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(255px,1fr))",gap:14}}>
+      {[...pinned,...rest].map((n,i)=>{const r=RAMPS[i%RAMPS.length];return(
+        <div key={n.id} style={{background:D.bg3,borderRadius:13,padding:"15px 16px",border:`1.5px solid ${r.b}`,borderTop:`3px solid ${r.h}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:7}}>
+            <div style={{fontSize:14,fontWeight:700,color:D.t1}}>{n.title}</div>
+            <div style={{display:"flex",gap:4}}>
+              <button onClick={()=>setNotes(p=>p.map(x=>x.id===n.id?{...x,pinned:!x.pinned}:x))} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,opacity:n.pinned?1:0.3}}>📌</button>
+              <button onClick={()=>openEdit(n)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:R.blue.t,opacity:0.8}}>✏️</button>
+              <button onClick={()=>setNotes(p=>p.filter(x=>x.id!==n.id))} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,opacity:0.35}}>🗑</button>
+            </div>
+          </div>
+          <div style={{fontSize:13,color:D.t2,lineHeight:1.6,marginBottom:9}}>{n.content}</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+            {(n.tags||[]).map(tid=><TagPip key={tid} cats={cats} id={tid}/>)}
+            <span style={{fontSize:10,color:D.t3,marginLeft:"auto"}}>{fmtD(n.created)}</span>
+          </div>
+        </div>
+      );})}
+    </div>
+    {showAdd&&<Modal title={editing?"Edit note":"New note"} onClose={()=>{setShowAdd(false);setEditing(null);}}>
+      <FInp label="Title" value={form.title} onChange={v=>f_("title",v)} placeholder="Note title"/>
+      <FTxt label="Content" value={form.content} onChange={v=>f_("content",v)} rows={5}/>
+      <FSel label="Folder" value={form.folder||"work"} onChange={v=>f_("folder",v)} opts={[{v:"work",l:"💼 Work"},{v:"personal",l:"🏠 Personal"}]}/>
+      <TagPick cats={cats} tagIds={tagIds} value={form.tags||[]} onChange={v=>f_("tags",v)}/>
+      <Attach files={form.attachments||[]} onChange={v=>f_("attachments",v)}/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <input type="checkbox" id="pin" checked={!!form.pinned} onChange={e=>f_("pinned",e.target.checked)}/><label htmlFor="pin" style={{fontSize:13,fontWeight:600,color:R.indigo.t}}>📌 Pin this note</label>
+      </div>
+      <div style={{display:"flex",gap:10}}><Btn onClick={save}>{editing?"Save changes":"Save note"}</Btn><Btn variant="ghost" onClick={()=>{setShowAdd(false);setEditing(null);}}>Cancel</Btn></div>
+    </Modal>}
+  </div>;
+}
+
+// ── Ideas ─────────────────────────────────────────────────────────────────────
+function Ideas({ideas,setIdeas,setTasks,logActivity,cats,deptIds,tagIds,statuses}){
+  const[showAdd,setShowAdd]=useState(false);
+  const[editing,setEditing]=useState(null);
+  const[promoted,setPromoted]=useState(null);
+  const[form,setForm]=useState({title:"",detail:"",priority:false,attachments:[]});
+  const[search,setSearch]=useState("");
+  const[dragIdx,setDragIdx]=useState(null);
+  const[overIdx,setOverIdx]=useState(null);
+  function save(){if(!form.title.trim())return;if(editing)setIdeas(p=>p.map(i=>i.id===editing.id?{...i,...form}:i));else setIdeas(p=>[...p,{...form,id:uid()}]);setShowAdd(false);setEditing(null);}
+  function promote(idea){const nt={id:uid(),title:idea.title,deptId:deptIds[0],status:"To Do",flag:"work",type:"Task",priority:idea.priority,due:"",start:today(),tags:[],notes:idea.detail,snoozedUntil:null,attachments:[]};setTasks(p=>[...p,nt]);setIdeas(p=>p.filter(i=>i.id!==idea.id));logActivity(`Promoted "${idea.title}"`,"🚀");setPromoted(nt);}
+  function drop(){if(dragIdx===null||overIdx===null||dragIdx===overIdx){setDragIdx(null);setOverIdx(null);return;}setIdeas(p=>{const a=[...p];const[item]=a.splice(dragIdx,1);a.splice(overIdx,0,item);return a;});setDragIdx(null);setOverIdx(null);}
+  const filtered_=ideas.filter(i=>!search||i.title.toLowerCase().includes(search.toLowerCase()));
+  const RAMPS=[R.violet,R.indigo,R.blue,R.green,R.yellow,R.orange,R.red];
+  return<div style={{padding:"24px 0"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+      <div style={{fontSize:22,fontWeight:800,color:D.t1}}>Future Ideas 💡</div>
+      <Btn onClick={()=>{setForm({title:"",detail:"",priority:false,attachments:[]});setEditing(null);setShowAdd(true);}}>＋ Capture idea</Btn>
+    </div>
+    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search ideas…" className="inp" style={{marginBottom:12}}/>
+    <div style={{fontSize:13,color:D.t2,marginBottom:14}}>Drag ⠿ to reorder. Promote to a task when ready.</div>
+    {filtered_.length===0&&<div style={{textAlign:"center",padding:40,color:D.t3,fontSize:14}}>No ideas yet 🌱</div>}
+    {filtered_.map((idea,i)=>{const r=RAMPS[i%RAMPS.length],isOver=overIdx===i&&dragIdx!==i;return(
+      <div key={idea.id} draggable onDragStart={()=>setDragIdx(i)} onDragOver={e=>{e.preventDefault();setOverIdx(i);}} onDrop={drop} onDragEnd={()=>{setDragIdx(null);setOverIdx(null);}}
+        style={{background:D.bg2,borderRadius:13,padding:"14px 17px",border:`1px solid ${isOver?r.h:r.b}`,borderLeft:`4px solid ${r.h}`,marginBottom:9,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,cursor:"grab",opacity:dragIdx===i?0.5:1}}>
+        <div style={{fontSize:17,color:D.t3,cursor:"grab",userSelect:"none",flexShrink:0}}>⠿</div>
+        <div style={{flex:1}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><div style={{fontSize:14,fontWeight:700,color:D.t1}}>{idea.title}</div>{idea.priority&&<PBadge/>}</div>
+          {idea.detail&&<div style={{fontSize:13,color:D.t2,lineHeight:1.6}}>{idea.detail}</div>}
+        </div>
+        <div style={{display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
+          <Btn sm variant="ghost" onClick={()=>promote(idea)}>→ Promote</Btn>
+          <button onClick={()=>{setForm({...idea});setEditing(idea);setShowAdd(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:R.blue.t,opacity:0.7}}>✏️</button>
+          <button onClick={()=>setIdeas(p=>p.filter(x=>x.id!==idea.id))} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,opacity:0.35,color:D.t2}}>🗑</button>
+        </div>
+      </div>
+    );})}
+    {showAdd&&<Modal title={editing?"Edit idea":"Capture an idea"} onClose={()=>{setShowAdd(false);setEditing(null);}}>
+      <FInp label="Idea title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="What's the idea?"/>
+      <FTxt label="Details" value={form.detail} onChange={v=>setForm(f=>({...f,detail:v}))} rows={4}/>
+      <Attach files={form.attachments||[]} onChange={v=>setForm(f=>({...f,attachments:v}))}/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <input type="checkbox" id="iprio" checked={!!form.priority} onChange={e=>setForm(f=>({...f,priority:e.target.checked}))}/><label htmlFor="iprio" style={{fontSize:13,fontWeight:600,color:R.orange.t}}>🔴 High priority</label>
+      </div>
+      <div style={{display:"flex",gap:10}}><Btn onClick={save}>{editing?"Save changes":"Save idea"}</Btn><Btn variant="ghost" onClick={()=>{setShowAdd(false);setEditing(null);}}>Cancel</Btn></div>
+    </Modal>}
+    {promoted&&<Modal title="Edit promoted task" onClose={()=>setPromoted(null)} wide>
+      <div style={{background:R.green.bg,border:`1px solid ${R.green.b}`,borderRadius:9,padding:"9px 13px",marginBottom:14,fontSize:13,color:R.green.t}}>✅ Promoted! Fill in department and tags.</div>
+      <TaskForm initial={promoted} onSave={t=>{setTasks(p=>p.map(x=>x.id===t.id?t:x));setPromoted(null);}} onCancel={()=>setPromoted(null)} contacts={[]} cats={cats} deptIds={deptIds} tagIds={tagIds} statuses={statuses}/>
+    </Modal>}
+  </div>;
+}
+
+// ── Master Files ──────────────────────────────────────────────────────────────
+function MasterFiles({contacts,setContacts,cats,setCats,statuses,setStatuses,tab,tasks,setTasks}){
+  const[compact,setCompact]=useState(false);
+  const[expandedId,setExpandedId]=useState(null);
+  const[showAdd,setShowAdd]=useState(false);
+  const[editing,setEditing]=useState(null);
+  const[form,setForm]=useState({name:"",address:"",phone:"",email:"",hours:"",type:"work"});
+  const[search,setSearch]=useState("");
+  const[editItem,setEditItem]=useState(null);
+  const[editForm,setEditForm]=useState({});
+  const[deletingCat,setDelCat]=useState(null);
+  const[delUsedBy,setDelUsedBy]=useState({active:[],completed:[]});
+  const[reassign,setReassign]=useState({});
+  const RAMP_OPTS=["red","orange","yellow","green","blue","indigo","violet","pink","teal","grey"];
+  const sorted=[...contacts].sort((a,b)=>a.name.localeCompare(b.name));
+  const filteredC=sorted.filter(c=>!search||c.name.toLowerCase().includes(search.toLowerCase()));
+  function saveC(){if(!form.name.trim())return;if(editing)setContacts(p=>p.map(c=>c.id===editing.id?{...c,...form}:c));else setContacts(p=>[...p,{...form,id:uid()}]);setShowAdd(false);setEditing(null);}
+  function startDel(c){const active=(tasks||[]).filter(t=>t.status!=="Complete"&&(t.deptId===c.id||(t.tags||[]).includes(c.id)));const completed=(tasks||[]).filter(t=>t.status==="Complete"&&(t.deptId===c.id||(t.tags||[]).includes(c.id)));setDelCat(c);setDelUsedBy({active,completed});setReassign({});}
+  function confirmDel(){if(!deletingCat)return;const cid=deletingCat.id;setTasks(p=>p.map(t=>{if(t.status!=="Complete"){const nd=reassign[t.id]||t.deptId;return{...t,deptId:t.deptId===cid?(nd):t.deptId,tags:(t.tags||[]).map(tag=>tag===cid?(reassign[t.id]||tag):tag)};}return{...t,deptId:t.deptId===cid?"_deleted":t.deptId,tags:(t.tags||[]).map(tag=>tag===cid?"_deleted":tag)};}));setCats(p=>p.filter(c=>c.id!==cid));setDelCat(null);setDelUsedBy({active:[],completed:[]});setReassign({});}
+  function saveEdit(){if(editItem.kind==="cat")setCats(p=>p.map(c=>c.id===editItem.item.id?{...c,...editForm}:c));if(editItem.kind==="status")setStatuses(p=>p.map(s=>s.id===editItem.item.id?{...s,...editForm}:s));setEditItem(null);}
+  const inp2={...{},padding:"7px 10px",borderRadius:9,border:`1.5px solid ${D.bd}`,fontSize:13,background:D.bg3,color:D.t1,cursor:"pointer"};
+  return<div style={{padding:"24px 0"}}>
+    <div style={{fontSize:22,fontWeight:800,color:D.t1,marginBottom:18}}>Master Files</div>
+    <div style={{background:D.bg2,borderRadius:12,border:`1px solid ${D.bd}`,padding:18}}>
+      {/* CONTACTS */}
+      {tab==="contacts"&&<div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search contacts…" className="inp" style={{flex:1,minWidth:170}}/>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setCompact(v=>!v)} style={{...inp2,fontWeight:600,fontSize:12,border:`1px solid ${compact?R.indigo.b:D.bd}`,background:compact?R.indigo.bg:D.bg3,color:compact?R.indigo.t:D.t2}}>{compact?"⊞ Full":"⊟ Compact"}</button>
+            <Btn onClick={()=>{setForm({name:"",address:"",phone:"",email:"",hours:"",type:"work"});setEditing(null);setShowAdd(true);}}>＋ Add</Btn>
+          </div>
+        </div>
+        {compact?(
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Name","Phone","Type",""].map(h=><th key={h} style={{padding:"7px 11px",fontSize:10,fontWeight:700,color:D.t3,textTransform:"uppercase",textAlign:"left",borderBottom:`1px solid #48456A`}}>{h}</th>)}</tr></thead>
+            <tbody>{filteredC.map(c=>{const fl=FM[c.type]||FM.work,isExp=expandedId===c.id;return(
+              <Fragment key={c.id}>
+                <tr style={{borderBottom:`1px solid ${D.bg3}`,cursor:"pointer",background:isExp?D.bg3:"transparent"}} onClick={()=>setExpandedId(isExp?null:c.id)}>
+                  <td style={{padding:"8px 11px",fontSize:13,fontWeight:600,color:D.t1}}><span style={{fontSize:11,color:D.t3,marginRight:5,display:"inline-block",transform:isExp?"rotate(90deg)":"rotate(0deg)",transition:"transform 0.15s"}}>▶</span>{c.name}</td>
+                  <td style={{padding:"8px 11px",fontSize:13,color:D.t2}}>{c.phone||"—"}</td>
+                  <td style={{padding:"8px 11px"}}><FChip flag={c.type}/></td>
+                  <td style={{padding:"8px 11px",whiteSpace:"nowrap"}} onClick={e=>e.stopPropagation()}>
+                    <button onClick={()=>{setForm({...c});setEditing(c);setShowAdd(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:R.blue.t,opacity:0.7,marginRight:6}}>✏️</button>
+                    <button onClick={()=>setContacts(p=>p.filter(x=>x.id!==c.id))} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,opacity:0.35,color:D.t2}}>🗑</button>
+                  </td>
+                </tr>
+                {isExp&&<tr style={{background:D.bg3}}><td colSpan={4} style={{padding:"9px 14px 11px 28px",borderBottom:`1px solid ${D.bd}`}}>
+                  {[{icon:"📍",val:c.address},{icon:"✉️",val:c.email},{icon:"🕐",val:c.hours}].filter(r=>r.val).map(r=><div key={r.icon} style={{fontSize:12,color:D.t2,marginBottom:3,display:"flex",gap:7}}><span>{r.icon}</span><span>{r.val}</span></div>)}
+                </td></tr>}
+              </Fragment>
+            );})}
+            </tbody>
+          </table>
+        ):(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(275px,1fr))",gap:14}}>
+            {filteredC.map(c=>{const fl=FM[c.type]||FM.work;return(
+              <div key={c.id} style={{background:D.bg3,borderRadius:13,padding:"15px 17px",border:`1.5px solid ${fl.b}`,borderTop:`3px solid ${fl.t}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                  <div><div style={{fontSize:14,fontWeight:700,color:D.t1,marginBottom:4}}>{c.name}</div><FChip flag={c.type}/></div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <div style={{width:34,height:34,borderRadius:99,background:fl.bg,border:`1px solid ${fl.b}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:fl.t,fontWeight:700}}>{c.name[0]}</div>
+                    <button onClick={()=>{setForm({...c});setEditing(c);setShowAdd(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:R.blue.t,opacity:0.7}}>✏️</button>
+                    <button onClick={()=>setContacts(p=>p.filter(x=>x.id!==c.id))} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,opacity:0.35,color:D.t2}}>🗑</button>
+                  </div>
+                </div>
+                {[{icon:"📍",val:c.address},{icon:"📞",val:c.phone},{icon:"✉️",val:c.email},{icon:"🕐",val:c.hours}].filter(r=>r.val).map(r=><div key={r.icon} style={{fontSize:12,color:D.t2,marginBottom:4,display:"flex",gap:7}}><span>{r.icon}</span><span>{r.val}</span></div>)}
+              </div>
+            );})}
+          </div>
+        )}
+      </div>}
+      {/* SYSTEM SETTINGS */}
+      {tab==="system"&&<div>
+        {/* Edit panel */}
+        {editItem&&<div style={{background:D.bg3,borderRadius:11,padding:16,border:`1px solid ${R.indigo.b}`,marginBottom:18}}>
+          <div style={{fontSize:13,fontWeight:700,color:D.t1,marginBottom:12}}>Editing: <span style={{color:R.indigo.t}}>{editForm.name}</span></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
+            <FInp label="Name" value={editForm.name||""} onChange={v=>setEditForm(f=>({...f,name:v}))}/>
+            <FInp label="Icon (emoji)" value={editForm.icon||""} onChange={v=>setEditForm(f=>({...f,icon:v}))} placeholder="e.g. 📊"/>
+          </div>
+          <div style={{marginBottom:14}}><Lbl>Colour ramp</Lbl>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{RAMP_OPTS.map(rn=>{const rp=ramp(rn);return<button key={rn} onClick={()=>setEditForm(f=>({...f,ramp:rn}))} style={{background:rp.bg,color:rp.t,border:`2px solid ${editForm.ramp===rn?rp.h:rp.b}`,borderRadius:8,padding:"4px 11px",cursor:"pointer",fontSize:12,fontWeight:700,textTransform:"capitalize"}}>{rn}</button>;})}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10}}><Btn sm onClick={saveEdit}>Save</Btn><Btn sm variant="ghost" onClick={()=>setEditItem(null)}>Cancel</Btn></div>
+        </div>}
+        {/* Delete safety */}
+        {deletingCat&&<div style={{background:R.red.bg,border:`1px solid ${R.red.b}`,borderRadius:11,padding:16,marginBottom:18}}>
+          <div style={{fontSize:13,fontWeight:700,color:R.red.t,marginBottom:10}}>⚠ Delete "{deletingCat.name}"?</div>
+          {delUsedBy.active.length>0&&<div style={{marginBottom:12}}>
+            <div style={{fontSize:12,color:R.red.t,marginBottom:7}}>These active tasks use this category — reassign:</div>
+            {delUsedBy.active.map(t=><div key={t.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:6,background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 10px",flexWrap:"wrap"}}>
+              <span style={{fontSize:12,fontWeight:600,color:D.t1,flex:1}}>{t.title}</span>
+              <select defaultValue="" onChange={e=>{if(e.target.value)setReassign(p=>({...p,[t.id]:e.target.value}));}} style={{padding:"3px 7px",borderRadius:7,border:`1px solid ${D.bd}`,fontSize:12,background:D.bg3,color:D.t1,cursor:"pointer"}}>
+                <option value="">— Reassign to… —</option>{cats.filter(c=>c.id!==deletingCat.id).map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              </select>
+            </div>)}
+          </div>}
+          {delUsedBy.active.length===0&&<div style={{fontSize:12,color:R.red.t,marginBottom:10}}>No active tasks use this. Safe to delete.</div>}
+          <div style={{display:"flex",gap:10}}><Btn sm variant="danger" onClick={confirmDel}>Confirm delete</Btn><Btn sm variant="ghost" onClick={()=>setDelCat(null)}>Cancel</Btn></div>
+        </div>}
+        {/* Categories */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontSize:13,fontWeight:700,color:D.t1}}>Categories</div>
+          <Btn sm onClick={()=>{const n=prompt("Category name:");if(!n)return;const ic=prompt("Icon (emoji):")||"📋";setCats(p=>[...p,{id:n.toLowerCase().replace(/\s+/g,"-")+"-"+uid().slice(-4),name:n.toUpperCase(),icon:ic,ramp:"grey"}]);}}>＋ Add</Btn>
+        </div>
+        <div style={{fontSize:12,color:D.t2,marginBottom:12}}>Click ✏️ to edit name/icon/colour. 🗑 to delete.</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:7,marginBottom:22}}>
+          {cats.map(c=>{const r=ramp(c.ramp);return<div key={c.id} style={{background:r.bg,border:`1px solid ${r.b}`,borderRadius:9,padding:"7px 11px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:5}}>
+            <span style={{fontSize:12,fontWeight:700,color:r.t}}>{c.icon} {c.name}</span>
+            <div style={{display:"flex",gap:3}}>
+              <button onClick={()=>{setEditItem({kind:"cat",item:c});setEditForm({...c});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:r.t,opacity:0.8}}>✏️</button>
+              <button onClick={()=>startDel(c)} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:R.red.t,opacity:0.7}}>🗑</button>
+            </div>
+          </div>;})}
+        </div>
+        {/* Statuses */}
+        <div style={{fontSize:13,fontWeight:700,color:D.t1,marginBottom:8}}>Statuses</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+          {statuses.map(s=>{const r=ramp(s.ramp);return<div key={s.id} style={{background:r.bg,border:`1px solid ${r.b}`,borderRadius:9,padding:"6px 13px",display:"flex",alignItems:"center",gap:7}}>
+            <span style={{fontSize:12,fontWeight:700,color:r.h}}>{s.icon} {s.name}</span>
+            <button onClick={()=>{setEditItem({kind:"status",item:s});setEditForm({...s});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:r.t,opacity:0.8}}>✏️</button>
+          </div>;})}
+        </div>
+      </div>}
+    </div>
+    {showAdd&&<Modal title={editing?"Edit contact":"Add contact"} onClose={()=>{setShowAdd(false);setEditing(null);}}>
+      <FInp label="Name" value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder="Contact or org name"/>
+      <FSel label="Type" value={form.type} onChange={v=>setForm(f=>({...f,type:v}))} opts={[{v:"work",l:"Work"},{v:"personal",l:"Personal"}]}/>
+      <FInp label="Address" value={form.address} onChange={v=>setForm(f=>({...f,address:v}))} placeholder="123 Main St"/>
+      <FInp label="Phone" value={form.phone} onChange={v=>setForm(f=>({...f,phone:v}))} placeholder="555-0000"/>
+      <FInp label="Email / Website" value={form.email} onChange={v=>setForm(f=>({...f,email:v}))} placeholder="email@example.com"/>
+      <FInp label="Hours" value={form.hours} onChange={v=>setForm(f=>({...f,hours:v}))} placeholder="Mon–Fri 9am–5pm"/>
+      <div style={{display:"flex",gap:10}}><Btn onClick={saveC}>{editing?"Save changes":"Save"}</Btn><Btn variant="ghost" onClick={()=>{setShowAdd(false);setEditing(null);}}>Cancel</Btn></div>
+    </Modal>}
+  </div>;
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+const NAV=[{id:"dashboard",l:"Dashboard",icon:"⚡"},{id:"projects",l:"Projects",icon:"🗃️"},{id:"calendar",l:"Calendar",icon:"📅"},{id:"notes",l:"Notes",icon:"📝"},{id:"ideas",l:"Ideas",icon:"💡"}];
+const SUB=(active)=>({display:"flex",alignItems:"center",gap:9,padding:"7px 22px 7px 36px",background:active?"rgba(123,111,255,0.1)":"none",border:"none",cursor:"pointer",width:"100%",borderLeft:`3px solid ${active?R.indigo.h:"transparent"}`,transition:"all 0.15s"});
+
+function App(){
+  // ── localStorage persistence helpers ────────────────────────────────────────
+  function load(key,fallback){try{const v=localStorage.getItem("fd_"+key);return v?JSON.parse(v):fallback;}catch(e){return fallback;}}
+  function save(key,val){try{localStorage.setItem("fd_"+key,JSON.stringify(val));}catch(e){}}
+
+  const[page,setPage]=useState(()=>load("page","dashboard"));
+  const[tasks,setTasks]=useState(()=>load("tasks",INIT_TASKS));
+  const[events,setEvents]=useState(()=>load("events",INIT_EVENTS));
+  const[notes,setNotes]=useState(()=>load("notes",INIT_NOTES));
+  const[ideas,setIdeas]=useState(()=>load("ideas",INIT_IDEAS));
+  const[contacts,setContacts]=useState(()=>load("contacts",INIT_CONTACTS));
+  const[cats,setCats]=useState(()=>load("cats",DEF_CATS));
+  const[statuses,setStatuses]=useState(()=>load("statuses",DEF_STATUSES));
+  const[filesTab,setFilesTab]=useState(()=>load("filesTab","contacts"));
+  const[notesTab,setNotesTab]=useState(()=>load("notesTab","work"));
+  const[mobileOpen,setMobileOpen]=useState(false);
+  const[saveFlash,setSaveFlash]=useState(false);
+
+  // Auto-save whenever data changes
+  useEffect(()=>{save("tasks",tasks);},[tasks]);
+  useEffect(()=>{save("events",events);},[events]);
+  useEffect(()=>{save("notes",notes);},[notes]);
+  useEffect(()=>{save("ideas",ideas);},[ideas]);
+  useEffect(()=>{save("contacts",contacts);},[contacts]);
+  useEffect(()=>{save("cats",cats);},[cats]);
+  useEffect(()=>{save("statuses",statuses);},[statuses]);
+  useEffect(()=>{save("page",page);},[page]);
+  useEffect(()=>{save("filesTab",filesTab);},[filesTab]);
+  useEffect(()=>{save("notesTab",notesTab);},[notesTab]);
+
+  // Flash "Saved" indicator on any data change
+  useEffect(()=>{
+    setSaveFlash(true);
+    const t=setTimeout(()=>setSaveFlash(false),1200);
+    return()=>clearTimeout(t);
+  },[tasks,events,notes,ideas,contacts,cats,statuses]);
+  const[log,logActivity]=useLog();
+  const deptIds=DEF_CATS.slice(0,6).map(c=>c.id);
+  const tagIds=DEF_CATS.slice(6).map(c=>c.id);
+  const shared={cats,statuses,deptIds,tagIds,logActivity};
+  const priCount=tasks.filter(t=>t.priority&&t.status==="In Progress"&&!snoozed(t)).length;
+  const blockCount=tasks.filter(t=>t.status==="Roadblock").length;
+  function Nav({n}){return<button onClick={()=>{setPage(n.id);setMobileOpen(false);}} style={{display:"flex",alignItems:"center",gap:11,padding:"10px 22px",background:page===n.id?"rgba(123,111,255,0.15)":"none",border:"none",cursor:"pointer",textAlign:"left",width:"100%",borderLeft:`3px solid ${page===n.id?R.indigo.h:"transparent"}`,transition:"all 0.15s"}}><span style={{fontSize:15}}>{n.icon}</span><span style={{fontSize:13,fontWeight:page===n.id?700:500,color:page===n.id?R.indigo.t:D.t2}}>{n.l}</span></button>;}
+  return<div style={{display:"flex",minHeight:"100vh",background:D.bg0}}>
+    <div id="mbar" style={{display:"none",position:"fixed",top:0,left:0,right:0,zIndex:200,background:D.bg1,padding:"11px 15px",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${D.bd}`}}>
+      <div style={{fontSize:22,fontWeight:800,fontFamily:"'Righteous',cursive",background:RB,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>FlowDesk</div>
+      <button onClick={()=>setMobileOpen(o=>!o)} style={{background:"none",border:"none",color:D.t1,fontSize:22,cursor:"pointer"}}>☰</button>
+    </div>
+    {mobileOpen&&<div style={{position:"fixed",inset:0,zIndex:150,background:"rgba(0,0,0,0.65)"}} onClick={()=>setMobileOpen(false)}/>}
+    <div id="sidebar" style={{width:218,background:D.bg1,flexShrink:0,display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh",zIndex:100,borderRight:`1px solid ${D.bd}`}}>
+      <div style={{height:3,background:RB}}/>
+      <div style={{padding:"20px 22px 22px"}}>
+        <div style={{fontSize:30,fontWeight:800,fontFamily:"'Righteous',cursive",background:RB,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1.1}}>FlowDesk</div>
+        <div style={{fontSize:12,color:D.t2,marginTop:3,fontWeight:600}}>Your unified workspace</div>
+      </div>
+      {NAV.map(n=><div key={n.id}><Nav n={n}/>
+        {/* Notes sub-folders — always visible */}
+        {n.id==="notes"&&<div>
+          <button onClick={()=>{setPage("notes");setNotesTab("work");}} style={SUB(page==="notes"&&notesTab==="work")}><span style={{fontSize:13}}>💼</span><span style={{fontSize:12,fontWeight:page==="notes"&&notesTab==="work"?700:400,color:page==="notes"&&notesTab==="work"?R.indigo.t:D.t3}}>Work</span></button>
+          <button onClick={()=>{setPage("notes");setNotesTab("personal");}} style={SUB(page==="notes"&&notesTab==="personal")}><span style={{fontSize:13}}>🏠</span><span style={{fontSize:12,fontWeight:page==="notes"&&notesTab==="personal"?700:400,color:page==="notes"&&notesTab==="personal"?R.indigo.t:D.t3}}>Personal</span></button>
+        </div>}
+      </div>)}
+      <div style={{flex:1}}/>
+      {/* Master files — always visible sub-nav */}
+      <div style={{borderTop:`1px solid ${D.bd}`}}>
+        <Nav n={{id:"files",l:"Master Files",icon:"🗄️"}}/>
+        <button onClick={()=>{setPage("files");setFilesTab("contacts");}} style={SUB(page==="files"&&filesTab==="contacts")}><span style={{fontSize:13}}>📇</span><span style={{fontSize:12,fontWeight:page==="files"&&filesTab==="contacts"?700:400,color:page==="files"&&filesTab==="contacts"?R.indigo.t:D.t3}}>Contacts</span></button>
+        <button onClick={()=>{setPage("files");setFilesTab("system");}} style={SUB(page==="files"&&filesTab==="system")}><span style={{fontSize:13}}>⚙️</span><span style={{fontSize:12,fontWeight:page==="files"&&filesTab==="system"?700:400,color:page==="files"&&filesTab==="system"?R.indigo.t:D.t3}}>System Settings</span></button>
+      </div>
+      <div style={{padding:"14px 22px",borderTop:`1px solid ${D.bd}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+          <div style={{fontSize:10,color:D.t3,textTransform:"uppercase",letterSpacing:"0.06em"}}>Quick stats</div>
+          <div style={{fontSize:10,fontWeight:700,color:R.green.t,opacity:saveFlash?1:0,transition:"opacity 0.4s"}}>✓ Saved</div>
+        </div>
+        <div style={{fontSize:12,color:D.t2,marginBottom:8}}><span style={{color:R.red.t}}>{priCount} priority</span>{" · "}<span style={{color:R.pink.t}}>{blockCount} blocked</span></div>
+        <button onClick={()=>{if(!window.confirm("Reset ALL data to defaults? This cannot be undone."))return;["tasks","events","notes","ideas","contacts","cats","statuses","page","filesTab","notesTab"].forEach(k=>localStorage.removeItem("fd_"+k));window.location.reload();}} style={{fontSize:10,color:D.t3,background:"none",border:`1px solid ${D.bd}`,borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit",width:"100%",opacity:0.6}}>↺ Reset to defaults</button>
+      </div>
+    </div>
+    <div style={{flex:1,overflowY:"auto"}} id="main">
+      <div style={{maxWidth:1150,margin:"0 auto",padding:"0 24px"}}>
+        {page==="dashboard"&&<Dashboard tasks={tasks} events={events} notes={notes} ideas={ideas} setTasks={setTasks} log={log} {...shared}/>}
+        {page==="projects" &&<Projects  tasks={tasks} setTasks={setTasks} contacts={contacts} {...shared}/>}
+        {page==="calendar" &&<CalendarView events={events} setEvents={setEvents} contacts={contacts} logActivity={logActivity}/>}
+        {page==="notes"    &&<Notes     notes={notes}  setNotes={setNotes} folder={notesTab} {...shared}/>}
+        {page==="ideas"    &&<Ideas     ideas={ideas}  setIdeas={setIdeas} setTasks={setTasks} {...shared}/>}
+        {page==="files"    &&<MasterFiles contacts={contacts} setContacts={setContacts} cats={cats} setCats={setCats} statuses={statuses} setStatuses={setStatuses} tab={filesTab} tasks={tasks} setTasks={setTasks}/>}
+      </div>
+    </div>
+    <style>{`@media(max-width:700px){#sidebar{display:none!important;}#mbar{display:flex!important;}#main{padding-top:54px;}}`}</style>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
