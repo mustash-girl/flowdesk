@@ -69,7 +69,7 @@ const DEF_STATUSES=[
   {id:"todo",    name:"To Do",      icon:"○",ramp:"blue"},
   {id:"inprog",  name:"In Progress",icon:"▶",ramp:"green"},
   {id:"block",   name:"Roadblock",  icon:"⚠",ramp:"pink"},
-  {id:"testing", name:"Waiting on Feedback",icon:"💬",ramp:"yellow"},
+  {id:"testing", name:"In Review",icon:"💬",ramp:"yellow"},
   {id:"parked",  name:"Parked",     icon:"⏸",ramp:"orange"},
   {id:"complete",name:"Complete",   icon:"✓",ramp:"grey"},
 ];
@@ -103,7 +103,7 @@ const INIT_TASKS=[
   {id:2,title:"Driver onboarding docs",     deptId:"operations",status:"To Do",      flag:"work",type:"Task",priority:false,due:mkD(14),start:mkD(4), tags:["workflow"],             notes:"",snoozedUntil:null,attachments:[],tools:[]},
   {id:3,title:"Carrier contract renewal",   deptId:"operations",status:"Roadblock",  flag:"work",type:"Task",priority:true, due:mkD(3), start:mkD(-12),tags:["mcleod"],              notes:"Waiting on legal review",snoozedUntil:null,attachments:[],tools:[]},
   {id:4,title:"Warehouse layout redesign",  deptId:"safety",    status:"Parked",     flag:"work",type:"Task",priority:false,due:mkD(35),start:mkD(19),tags:["other"],                notes:"",snoozedUntil:null,attachments:[],tools:[]},
-  {id:5,title:"Q3 KPI dashboard",           deptId:"accounting",status:"Waiting on Feedback",    flag:"work",type:"Task",priority:false,due:mkD(19),start:mkD(4), tags:["dashboard2","analytics"],notes:"",snoozedUntil:null,attachments:[],tools:[]},
+  {id:5,title:"Q3 KPI dashboard",           deptId:"accounting",status:"In Review",    flag:"work",type:"Task",priority:false,due:mkD(19),start:mkD(4), tags:["dashboard2","analytics"],notes:"",snoozedUntil:null,attachments:[],tools:[]},
   {id:6,title:"Annual vehicle inspection",  deptId:"safety",    status:"Complete",   flag:"work",type:"Appointment",priority:false,due:mkD(-7),start:mkD(-17),tags:["analytics"],notes:"",snoozedUntil:null,attachments:[],tools:[]},
   {id:7,title:"Dentist appointment",        deptId:"misc",      status:"To Do",      flag:"personal",type:"Appointment",priority:false,due:mkD(9),start:mkD(9),tags:["personal"],notes:"Downtown Dental, 9am",snoozedUntil:null,attachments:[],tools:[]},
   {id:8,title:"Book team offsite venue",    deptId:"sweetpac",  status:"In Progress",flag:"work",type:"Meeting",priority:false,due:mkD(24),start:mkD(-2),tags:["other"],notes:"",snoozedUntil:null,attachments:[],tools:[]},
@@ -212,8 +212,7 @@ function TaskForm({initial,onSave,onCancel,contacts,cats,deptIds,tagIds,statuses
   const f=(k,v)=>setF(p=>({...p,[k]:v}));
   const ci={padding:"6px 10px",borderRadius:8,border:"1.5px solid #3A3860",fontSize:13,outline:"none",background:D.bg3,color:D.t1,width:"100%",boxSizing:"border-box",fontFamily:"inherit"};
   const cl={fontSize:10,fontWeight:700,color:D.t2,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em",display:"block"};
-  function CF({label,value,onChange,type="text",placeholder=""}){return<div style={{marginBottom:8}}><label style={cl}>{label}</label><input style={ci} type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/></div>;}
-  function CS({label,value,onChange,opts}){return<div style={{marginBottom:8}}><label style={cl}>{label}</label><select style={{...ci,cursor:"pointer"}} value={value} onChange={e=>onChange(e.target.value)}>{opts.map(o=><option key={o.v||o} value={o.v||o}>{o.l||o}</option>)}</select></div>;}
+
   return<div>
     <div style={{marginBottom:8}}>
       <label style={cl}>Department</label>
@@ -221,12 +220,12 @@ function TaskForm({initial,onSave,onCancel,contacts,cats,deptIds,tagIds,statuses
         {cats.filter(c=>deptIds.includes(c.id)).map(c=>{const r=ramp(c.ramp);return<button key={c.id} type="button" onClick={()=>f("deptId",c.id)} style={{background:form.deptId===c.id?r.bg:D.bg3,color:form.deptId===c.id?r.t:D.t3,border:`1.5px solid ${form.deptId===c.id?r.b:"#3A3860"}`,borderRadius:8,padding:"4px 9px",cursor:"pointer",fontSize:11,fontWeight:700}}>{c.icon} {c.name}</button>;})}
       </div>
     </div>
-    <CF label="Title" value={form.title} onChange={v=>f("title",v)} placeholder="Task name"/>
+    <div style={{marginBottom:8}}><label style={cl}>Title</label><input style={ci} value={form.title} onChange={e=>f("title",e.target.value)} placeholder="Task name"/></div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:"0 10px"}}>
-      <CS label="Status" value={form.status||"To Do"} onChange={v=>f("status",v)} opts={statuses.map(s=>s.name)}/>
-      <CS label="Flag"   value={form.flag}  onChange={v=>f("flag",v)}  opts={[{v:"work",l:"Work"},{v:"personal",l:"Personal"}]}/>
-      <CF label="Due"    value={form.due}   onChange={v=>f("due",v)}   type="date"/>
-      <CF label="Start"  value={form.start} onChange={v=>f("start",v)} type="date"/>
+      <div style={{marginBottom:8}}><label style={cl}>Status</label><select style={{...ci,cursor:"pointer"}} value={form.status||"To Do"} onChange={e=>f("status",e.target.value)}>{statuses.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select></div>
+      <div style={{marginBottom:8}}><label style={cl}>Flag</label><select style={{...ci,cursor:"pointer"}} value={form.flag} onChange={e=>f("flag",e.target.value)}><option value="work">Work</option><option value="personal">Personal</option></select></div>
+      <div style={{marginBottom:8}}><label style={cl}>Due</label><input style={ci} type="date" value={form.due} onChange={e=>f("due",e.target.value)}/></div>
+      <div style={{marginBottom:8}}><label style={cl}>Start</label><input style={ci} type="date" value={form.start} onChange={e=>f("start",e.target.value)}/></div>
     </div>
     <div style={{marginBottom:8}}>
       <label style={cl}>Tags</label>
@@ -241,7 +240,7 @@ function TaskForm({initial,onSave,onCancel,contacts,cats,deptIds,tagIds,statuses
           {(tools||DEF_TOOLS).map(tool=>{const sel=(form.tools||[]).includes(tool.id);return<button key={tool.id} type="button" onClick={()=>f("tools",sel?(form.tools||[]).filter(x=>x!==tool.id):[...(form.tools||[]),tool.id])} style={{background:sel?R.teal.bg:D.bg3,color:sel?R.teal.t:D.t3,border:`1.5px solid ${sel?R.teal.b:"#3A3860"}`,borderRadius:8,padding:"4px 9px",cursor:"pointer",fontSize:11,fontWeight:700}}>{tool.icon} {tool.name}</button>;})}
         </div>
       </div>
-      <CF label="Collab with" value={form.collab||""} onChange={v=>f("collab",v)} placeholder="Names or teams"/>
+      <div style={{marginBottom:8}}><label style={cl}>Collab with</label><input style={ci} value={form.collab||""} onChange={e=>f("collab",e.target.value)} placeholder="Names or teams"/></div>
     </div>
     <div style={{marginBottom:8}}>
       <label style={cl}>Notes</label>
@@ -1104,13 +1103,13 @@ function App(){
   function save(key,val){try{localStorage.setItem("fd_"+key,JSON.stringify(val));}catch(e){}}
 
   const[page,setPage]=useState(()=>load("page","dashboard"));
-  const[tasks,setTasks]=useState(()=>load("tasks",INIT_TASKS));
+  const[tasks,setTasks]=useState(()=>load("tasks",INIT_TASKS).map(t=>t.status==="Testing"||t.status==="Waiting on Feedback"||t.status==="Pending Feedback"?{...t,status:"In Review"}:t));
   const[events,setEvents]=useState(()=>load("events",INIT_EVENTS));
   const[notes,setNotes]=useState(()=>load("notes",INIT_NOTES));
   const[ideas,setIdeas]=useState(()=>load("ideas",INIT_IDEAS));
   const[contacts,setContacts]=useState(()=>load("contacts",INIT_CONTACTS));
   const[cats,setCats]=useState(()=>load("cats",DEF_CATS));
-  const[statuses,setStatuses]=useState(()=>load("statuses",DEF_STATUSES));
+  const[statuses,setStatuses]=useState(()=>load("statuses",DEF_STATUSES).map(s=>s.id==="testing"&&(s.name==="Testing"||s.name==="Waiting on Feedback"||s.name==="Pending Feedback")?{...s,name:"In Review",icon:"💬"}:s));
   const[tools,setTools]=useState(()=>load("tools",DEF_TOOLS));
   const[filesTab,setFilesTab]=useState(()=>load("filesTab","contacts"));
   const[notesTab,setNotesTab]=useState(()=>load("notesTab","work"));
