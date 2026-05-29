@@ -69,7 +69,7 @@ const DEF_STATUSES=[
   {id:"todo",    name:"To Do",      icon:"○",ramp:"blue"},
   {id:"inprog",  name:"In Progress",icon:"▶",ramp:"green"},
   {id:"block",   name:"Roadblock",  icon:"⚠",ramp:"pink"},
-  {id:"testing", name:"Testing",    icon:"⚗",ramp:"yellow"},
+  {id:"testing", name:"Waiting on Feedback",icon:"💬",ramp:"yellow"},
   {id:"parked",  name:"Parked",     icon:"⏸",ramp:"orange"},
   {id:"complete",name:"Complete",   icon:"✓",ramp:"grey"},
 ];
@@ -103,7 +103,7 @@ const INIT_TASKS=[
   {id:2,title:"Driver onboarding docs",     deptId:"operations",status:"To Do",      flag:"work",type:"Task",priority:false,due:mkD(14),start:mkD(4), tags:["workflow"],             notes:"",snoozedUntil:null,attachments:[],tools:[]},
   {id:3,title:"Carrier contract renewal",   deptId:"operations",status:"Roadblock",  flag:"work",type:"Task",priority:true, due:mkD(3), start:mkD(-12),tags:["mcleod"],              notes:"Waiting on legal review",snoozedUntil:null,attachments:[],tools:[]},
   {id:4,title:"Warehouse layout redesign",  deptId:"safety",    status:"Parked",     flag:"work",type:"Task",priority:false,due:mkD(35),start:mkD(19),tags:["other"],                notes:"",snoozedUntil:null,attachments:[],tools:[]},
-  {id:5,title:"Q3 KPI dashboard",           deptId:"accounting",status:"Testing",    flag:"work",type:"Task",priority:false,due:mkD(19),start:mkD(4), tags:["dashboard2","analytics"],notes:"",snoozedUntil:null,attachments:[],tools:[]},
+  {id:5,title:"Q3 KPI dashboard",           deptId:"accounting",status:"Waiting on Feedback",    flag:"work",type:"Task",priority:false,due:mkD(19),start:mkD(4), tags:["dashboard2","analytics"],notes:"",snoozedUntil:null,attachments:[],tools:[]},
   {id:6,title:"Annual vehicle inspection",  deptId:"safety",    status:"Complete",   flag:"work",type:"Appointment",priority:false,due:mkD(-7),start:mkD(-17),tags:["analytics"],notes:"",snoozedUntil:null,attachments:[],tools:[]},
   {id:7,title:"Dentist appointment",        deptId:"misc",      status:"To Do",      flag:"personal",type:"Appointment",priority:false,due:mkD(9),start:mkD(9),tags:["personal"],notes:"Downtown Dental, 9am",snoozedUntil:null,attachments:[],tools:[]},
   {id:8,title:"Book team offsite venue",    deptId:"sweetpac",  status:"In Progress",flag:"work",type:"Meeting",priority:false,due:mkD(24),start:mkD(-2),tags:["other"],notes:"",snoozedUntil:null,attachments:[],tools:[]},
@@ -210,37 +210,57 @@ function TaskForm({initial,onSave,onCancel,contacts,cats,deptIds,tagIds,statuses
   const bl={title:"",deptId:deptIds[0],flag:"work",type:"Task",priority:false,due:"",start:today(),notes:"",tags:[],status:"To Do",snoozedUntil:null,masterFileId:null,attachments:[],tools:[],collab:""};
   const[form,setF]=useState(initial||bl);
   const f=(k,v)=>setF(p=>({...p,[k]:v}));
+  const ci={padding:"6px 10px",borderRadius:8,border:"1.5px solid #3A3860",fontSize:13,outline:"none",background:D.bg3,color:D.t1,width:"100%",boxSizing:"border-box",fontFamily:"inherit"};
+  const cl={fontSize:10,fontWeight:700,color:D.t2,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em",display:"block"};
+  function CF({label,value,onChange,type="text",placeholder=""}){return<div style={{marginBottom:8}}><label style={cl}>{label}</label><input style={ci} type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/></div>;}
+  function CS({label,value,onChange,opts}){return<div style={{marginBottom:8}}><label style={cl}>{label}</label><select style={{...ci,cursor:"pointer"}} value={value} onChange={e=>onChange(e.target.value)}>{opts.map(o=><option key={o.v||o} value={o.v||o}>{o.l||o}</option>)}</select></div>;}
   return<div>
-    <CatPick cats={cats} deptIds={deptIds} value={form.deptId} onChange={v=>f("deptId",v)}/>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
-      <div style={{gridColumn:"1/-1"}}><FInp label="Title" value={form.title} onChange={v=>f("title",v)} placeholder="Task name"/></div>
-      <FSel label="Type" value={form.type} onChange={v=>f("type",v)} opts={TYPES}/>
-      <FSel label="Flag" value={form.flag} onChange={v=>f("flag",v)} opts={[{v:"work",l:"Work"},{v:"personal",l:"Personal"}]}/>
-      <FSel label="Status" value={form.status||"To Do"} onChange={v=>f("status",v)} opts={statuses.map(s=>s.name)}/>
-      <FSel label="Assignee" value={form.assignee||"You"} onChange={v=>f("assignee",v)} opts={["You"]}/>
-      <FInp label="Due"   value={form.due}   onChange={v=>f("due",v)}   type="date"/>
-      <FInp label="Start (optional)" value={form.start} onChange={v=>f("start",v)} type="date"/>
-    </div>
-    <TagPick cats={cats} tagIds={tagIds} value={form.tags||[]} onChange={v=>f("tags",v)}/>
-    <FInp label="Collab with" value={form.collab||""} onChange={v=>f("collab",v)} placeholder="Names or teams collaborating on this"/>
-    <FTxt label="Notes" value={form.notes} onChange={v=>f("notes",v)}/>
-    <div style={{marginBottom:12}}><Lbl>Tools / Databases required</Lbl>
-      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-        {(tools||DEF_TOOLS).map(tool=>{const sel=(form.tools||[]).includes(tool.id);return<button key={tool.id} type="button" onClick={()=>f("tools",sel?(form.tools||[]).filter(x=>x!==tool.id):[...(form.tools||[]),tool.id])} style={{background:sel?R.teal.bg:D.bg3,color:sel?R.teal.t:D.t3,border:`1.5px solid ${sel?R.teal.b:D.bd}`,borderRadius:9,padding:"5px 10px",cursor:"pointer",fontSize:12,fontWeight:700}}>{tool.icon} {tool.name}</button>;})}
+    <div style={{marginBottom:8}}>
+      <label style={cl}>Department</label>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+        {cats.filter(c=>deptIds.includes(c.id)).map(c=>{const r=ramp(c.ramp);return<button key={c.id} type="button" onClick={()=>f("deptId",c.id)} style={{background:form.deptId===c.id?r.bg:D.bg3,color:form.deptId===c.id?r.t:D.t3,border:`1.5px solid ${form.deptId===c.id?r.b:"#3A3860"}`,borderRadius:8,padding:"4px 9px",cursor:"pointer",fontSize:11,fontWeight:700}}>{c.icon} {c.name}</button>;})}
       </div>
+    </div>
+    <CF label="Title" value={form.title} onChange={v=>f("title",v)} placeholder="Task name"/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:"0 10px"}}>
+      <CS label="Status" value={form.status||"To Do"} onChange={v=>f("status",v)} opts={statuses.map(s=>s.name)}/>
+      <CS label="Flag"   value={form.flag}  onChange={v=>f("flag",v)}  opts={[{v:"work",l:"Work"},{v:"personal",l:"Personal"}]}/>
+      <CF label="Due"    value={form.due}   onChange={v=>f("due",v)}   type="date"/>
+      <CF label="Start"  value={form.start} onChange={v=>f("start",v)} type="date"/>
+    </div>
+    <div style={{marginBottom:8}}>
+      <label style={cl}>Tags</label>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+        {cats.filter(c=>tagIds.includes(c.id)).map(c=>{const sel=(form.tags||[]).includes(c.id),r=ramp(c.ramp);return<button key={c.id} type="button" onClick={()=>f("tags",sel?(form.tags||[]).filter(x=>x!==c.id):[...(form.tags||[]),c.id])} style={{background:sel?r.bg:D.bg3,color:sel?r.t:D.t3,border:`1.5px solid ${sel?r.b:"#3A3860"}`,borderRadius:8,padding:"4px 9px",cursor:"pointer",fontSize:11,fontWeight:700}}>{c.icon} {c.name}</button>;})}
+      </div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px",marginBottom:8}}>
+      <div>
+        <label style={cl}>Tools / Databases</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {(tools||DEF_TOOLS).map(tool=>{const sel=(form.tools||[]).includes(tool.id);return<button key={tool.id} type="button" onClick={()=>f("tools",sel?(form.tools||[]).filter(x=>x!==tool.id):[...(form.tools||[]),tool.id])} style={{background:sel?R.teal.bg:D.bg3,color:sel?R.teal.t:D.t3,border:`1.5px solid ${sel?R.teal.b:"#3A3860"}`,borderRadius:8,padding:"4px 9px",cursor:"pointer",fontSize:11,fontWeight:700}}>{tool.icon} {tool.name}</button>;})}
+        </div>
+      </div>
+      <CF label="Collab with" value={form.collab||""} onChange={v=>f("collab",v)} placeholder="Names or teams"/>
+    </div>
+    <div style={{marginBottom:8}}>
+      <label style={cl}>Notes</label>
+      <textarea style={{...ci,resize:"vertical"}} value={form.notes} onChange={e=>f("notes",e.target.value)} rows={6}/>
     </div>
     <Attach files={form.attachments||[]} onChange={v=>f("attachments",v)}/>
     {contacts&&contacts.length>0&&<MFSel contacts={contacts} value={form.masterFileId} onChange={v=>f("masterFileId",v)}/>}
-    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-      <input type="checkbox" id="prio" checked={!!form.priority} onChange={e=>f("priority",e.target.checked)}/>
-      <label htmlFor="prio" style={{fontSize:13,fontWeight:600,color:R.orange.t}}>🔴 Mark as priority</label>
-    </div>
-    <div style={{display:"flex",gap:10}}>
-      <Btn onClick={()=>onSave({...form,id:form.id||uid()})}>{initial?"Save changes":"Add task"}</Btn>
-      <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,marginTop:4}}>
+      <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,fontWeight:600,color:R.orange.t,cursor:"pointer"}}>
+        <input type="checkbox" checked={!!form.priority} onChange={e=>f("priority",e.target.checked)}/>🔴 Priority
+      </label>
+      <div style={{display:"flex",gap:8}}>
+        <Btn onClick={()=>onSave({...form,id:form.id||uid()})}>{initial?"Save changes":"Add task"}</Btn>
+        <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
+      </div>
     </div>
   </div>;
 }
+
 
 // ── Activity log ──────────────────────────────────────────────────────────────
 function useLog(){
@@ -331,6 +351,43 @@ function DashPanels({tasks,events,log,prios,upcoming,scount,cats,statuses}){
   </div>;
 }
 
+// ── Dashboard To-Do Today (read-only view) ───────────────────────────────────
+function DashToday(){
+  const[todos,setTodos]=useState(()=>{try{return JSON.parse(localStorage.getItem("fd_todos")||"[]");}catch(e){return[];}});
+  // Poll for changes from Notes tab every 2 seconds
+  useEffect(()=>{
+    const iv=setInterval(()=>{
+      try{const t=JSON.parse(localStorage.getItem("fd_todos")||"[]");setTodos(t);}catch(e){}
+    },2000);
+    return()=>clearInterval(iv);
+  },[]);
+  if(todos.length===0)return null;
+  const active=todos.filter(t=>!t.done);
+  const done=todos.filter(t=>t.done);
+  return(
+    <div style={{background:D.bg2,borderRadius:14,padding:16,border:`1px solid ${R.indigo.b}`,marginBottom:18}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:700,color:R.indigo.t}}>📌 To-Do Today</div>
+        <span style={{fontSize:11,color:D.t3}}>{done.length}/{todos.length} done · edit in Notes</span>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:7}}>
+        {active.map(t=>(
+          <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:7,background:D.bg3,borderRadius:8,padding:"7px 10px",border:`1px solid ${R.indigo.b}44`}}>
+            <span style={{fontSize:12,color:R.indigo.t,flexShrink:0,marginTop:1}}>○</span>
+            <span style={{fontSize:12,color:D.t1,lineHeight:1.4}}>{t.text}</span>
+          </div>
+        ))}
+        {done.map(t=>(
+          <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:7,background:D.bg1,borderRadius:8,padding:"7px 10px",border:`1px solid ${D.bd}`,opacity:0.5}}>
+            <span style={{fontSize:12,color:R.green.t,flexShrink:0,marginTop:1}}>✓</span>
+            <span style={{fontSize:12,color:D.t3,lineHeight:1.4,textDecoration:"line-through"}}>{t.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({tasks,events,notes,ideas,setTasks,cats,statuses,log,logActivity}){
   const prios=tasks.filter(t=>t.priority&&t.status!=="Complete");
@@ -351,6 +408,7 @@ function Dashboard({tasks,events,notes,ideas,setTasks,cats,statuses,log,logActiv
     <div style={{fontSize:14,color:D.t2,marginBottom:20}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</div>
     <StatCards cards={cards}/>
     <RemBanner tasks={tasks} setTasks={setTasks} cats={cats} logActivity={logActivity}/>
+    <DashToday/>
     <DashPanels tasks={tasks} events={events} log={log} prios={prios} upcoming={upcoming} scount={scount} cats={cats} statuses={statuses}/>
   </div>;
 }
