@@ -205,7 +205,7 @@ function MFSel({contacts,value,onChange}){
   </div>;
 }
 function TaskForm({initial,onSave,onCancel,contacts,cats,deptIds,tagIds,statuses,tools}){
-  const bl={title:"",deptId:deptIds[0],flag:"work",type:"Task",priority:false,due:"",start:today(),notes:"",tags:[],status:"To Do",snoozedUntil:null,masterFileId:null,attachments:[]};
+  const bl={title:"",deptId:deptIds[0],flag:"work",type:"Task",priority:false,due:"",start:today(),notes:"",tags:[],status:"To Do",snoozedUntil:null,masterFileId:null,attachments:[],tools:[],collab:""};
   const[form,setF]=useState(initial||bl);
   const f=(k,v)=>setF(p=>({...p,[k]:v}));
   return<div>
@@ -220,6 +220,7 @@ function TaskForm({initial,onSave,onCancel,contacts,cats,deptIds,tagIds,statuses
       <FInp label="Start (optional)" value={form.start} onChange={v=>f("start",v)} type="date"/>
     </div>
     <TagPick cats={cats} tagIds={tagIds} value={form.tags||[]} onChange={v=>f("tags",v)}/>
+    <FInp label="Collab with" value={form.collab||""} onChange={v=>f("collab",v)} placeholder="Names or teams collaborating on this"/>
     <FTxt label="Notes" value={form.notes} onChange={v=>f("notes",v)}/>
     <div style={{marginBottom:12}}><Lbl>Tools / Databases required</Lbl>
       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -931,20 +932,52 @@ function MasterFiles({contacts,setContacts,cats,setCats,statuses,setStatuses,tab
           </div>;})}
         </div>
         {/* Tools / Databases */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,marginTop:10}}>
-          <div style={{fontSize:13,fontWeight:700,color:D.t1}}>Tools / Databases</div>
-          <Btn sm onClick={()=>{const n=prompt("Tool/database name:");if(!n)return;const ic=prompt("Icon (emoji):")||"🔧";setTools(p=>[...p,{id:n.toLowerCase().replace(/\s+/g,"-")+"-"+uid().slice(-4),name:n,icon:ic}]);}}>＋ Add</Btn>
-        </div>
-        <div style={{fontSize:12,color:D.t2,marginBottom:10}}>These appear as options when creating or editing a task.</div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:22}}>
-          {tools.map(tool=>(
-            <div key={tool.id} style={{background:R.teal.bg,border:`1px solid ${R.teal.b}`,borderRadius:9,padding:"6px 13px",display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:12,fontWeight:700,color:R.teal.t}}>{tool.icon} {tool.name}</span>
-              <button onClick={()=>{const n=prompt("Rename:",tool.name);if(n)setTools(p=>p.map(t=>t.id===tool.id?{...t,name:n}:t));}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:R.teal.t,opacity:0.8}}>✏️</button>
-              <button onClick={()=>{if(window.confirm(`Delete "${tool.name}"?`))setTools(p=>p.filter(t=>t.id!==tool.id));}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:R.red.t,opacity:0.7}}>🗑</button>
+        {(()=>{
+          const[showToolForm,setShowToolForm]=React.useState(false);
+          const[toolForm,setToolForm]=React.useState({name:"",icon:"🔧"});
+          const[editingTool,setEditingTool]=React.useState(null);
+          function saveTool(){
+            if(!toolForm.name.trim())return;
+            if(editingTool){setTools(p=>p.map(t=>t.id===editingTool.id?{...t,...toolForm}:t));}
+            else{setTools(p=>[...p,{id:toolForm.name.toLowerCase().replace(/[^a-z0-9]/g,"-")+"-"+uid().slice(-4),name:toolForm.name,icon:toolForm.icon||"🔧"}]);}
+            setToolForm({name:"",icon:"🔧"});setEditingTool(null);setShowToolForm(false);
+          }
+          return(<div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,marginTop:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:D.t1}}>Tools / Databases</div>
+              <Btn sm onClick={()=>{setToolForm({name:"",icon:"🔧"});setEditingTool(null);setShowToolForm(true);}}>＋ Add</Btn>
             </div>
-          ))}
-        </div>
+            <div style={{fontSize:12,color:D.t2,marginBottom:10}}>These appear as options when creating or editing a task.</div>
+            {showToolForm&&<div style={{background:D.bg3,borderRadius:10,padding:"12px 14px",marginBottom:12,border:`1px solid ${R.teal.b}`}}>
+              <div style={{marginBottom:10}}>
+                <Lbl>Pick an icon</Lbl>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+                  {["🔧","💻","🖥️","📊","📋","🗂️","🚚","📦","🌱","⚙️","🔗","🔌","📡","🛠️","📱","🖨️","💾","🗄️","🔐","📈","🤖","⚡","🌐","📂","🧮"].map(em=>(
+                    <button key={em} type="button" onClick={()=>setToolForm(f=>({...f,icon:em}))}
+                      style={{fontSize:20,background:toolForm.icon===em?R.teal.bg:D.bg2,border:`2px solid ${toolForm.icon===em?R.teal.h:D.bd}`,borderRadius:8,padding:"4px 7px",cursor:"pointer",lineHeight:1}}>
+                      {em}
+                    </button>
+                  ))}
+                </div>
+                <Lbl>Name</Lbl>
+                <input value={toolForm.name} onChange={e=>setToolForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Salesforce" className="inp"/>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <Btn sm onClick={saveTool}>{editingTool?"Save changes":"Add tool"}</Btn>
+                <Btn sm variant="ghost" onClick={()=>{setShowToolForm(false);setEditingTool(null);}}>Cancel</Btn>
+              </div>
+            </div>}
+            <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:22}}>
+              {tools.map(tool=>(
+                <div key={tool.id} style={{background:R.teal.bg,border:`1px solid ${R.teal.b}`,borderRadius:9,padding:"6px 13px",display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:12,fontWeight:700,color:R.teal.t}}>{tool.icon} {tool.name}</span>
+                  <button onClick={()=>{setToolForm({name:tool.name,icon:tool.icon});setEditingTool(tool);setShowToolForm(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:R.teal.t,opacity:0.8}}>✏️</button>
+                  <button onClick={()=>{if(window.confirm(`Delete "${tool.name}"?`))setTools(p=>p.filter(t=>t.id!==tool.id));}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:R.red.t,opacity:0.7}}>🗑</button>
+                </div>
+              ))}
+            </div>
+          </div>);
+        })()}
         {/* Statuses */}
         <div style={{fontSize:13,fontWeight:700,color:D.t1,marginBottom:8}}>Statuses</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
