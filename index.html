@@ -901,7 +901,7 @@ function Ideas({ideas,setIdeas,setTasks,logActivity,cats,deptIds,tagIds,statuses
 }
 
 // ── Master Files ──────────────────────────────────────────────────────────────
-function MasterFiles({contacts,setContacts,cats,setCats,statuses,setStatuses,tab,tasks,setTasks}){
+function MasterFiles({contacts,setContacts,cats,setCats,statuses,setStatuses,tab,tasks,setTasks,events,notes,ideas}){
   const[compact,setCompact]=useState(false);
   const[expandedId,setExpandedId]=useState(null);
   const[showAdd,setShowAdd]=useState(false);
@@ -1025,6 +1025,23 @@ function MasterFiles({contacts,setContacts,cats,setCats,statuses,setStatuses,tab
             <button onClick={()=>{setEditItem({kind:"status",item:s});setEditForm({...s});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:r.t,opacity:0.8}}>✏️</button>
           </div>;})}
         </div>
+        {/* Data Management */}
+        <div style={{marginTop:28,paddingTop:20,borderTop:`1px solid ${D.bd}`}}>
+          <div style={{fontSize:13,fontWeight:700,color:D.t1,marginBottom:6}}>💾 Data &amp; Storage</div>
+          <div style={{fontSize:12,color:D.t2,marginBottom:14}}>Your data is saved automatically in your browser's local storage — it persists across page reloads and GitHub deployments. It is stored only on this device.</div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <Btn sm variant="ghost" onClick={()=>{
+              const data={tasks,events,notes,ideas,contacts,cats,statuses};
+              const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+              const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="flowdesk-backup.json";a.click();
+            }}>⬇ Export backup</Btn>
+            <Btn sm variant="danger" onClick={()=>{
+              if(!window.confirm("Reset ALL data to sample data? This cannot be undone."))return;
+              ["fd_tasks","fd_events","fd_notes","fd_ideas","fd_contacts","fd_cats","fd_statuses","fd_page"].forEach(k=>localStorage.removeItem(k));
+              window.location.reload();
+            }}>🔄 Reset to sample data</Btn>
+          </div>
+        </div>
       </div>}
     </div>
     {showAdd&&<Modal title={editing?"Edit contact":"Add contact"} onClose={()=>{setShowAdd(false);setEditing(null);}}>
@@ -1043,15 +1060,32 @@ function MasterFiles({contacts,setContacts,cats,setCats,statuses,setStatuses,tab
 const NAV=[{id:"dashboard",l:"Dashboard",icon:"⚡"},{id:"projects",l:"Projects",icon:"🗃️"},{id:"calendar",l:"Calendar",icon:"📅"},{id:"notes",l:"Notes",icon:"📝"},{id:"ideas",l:"Ideas",icon:"💡"}];
 const SUB=(active)=>({display:"flex",alignItems:"center",gap:9,padding:"7px 22px 7px 36px",background:active?"rgba(123,111,255,0.1)":"none",border:"none",cursor:"pointer",width:"100%",borderLeft:`3px solid ${active?R.indigo.h:"transparent"}`,transition:"all 0.15s"});
 
+// ── localStorage helpers ──────────────────────────────────────────────────────
+function usePersist(key,init){
+  const[val,setVal]=useState(()=>{
+    try{const s=localStorage.getItem(key);return s?JSON.parse(s):init;}
+    catch{return init;}
+  });
+  const set=useCallback(v=>{
+    setVal(prev=>{
+      const next=typeof v==="function"?v(prev):v;
+      try{localStorage.setItem(key,JSON.stringify(next));}catch{}
+      return next;
+    });
+  },[key]);
+  return[val,set];
+}
+
 function App(){
-  const[page,setPage]=useState("dashboard");
-  const[tasks,setTasks]=useState(INIT_TASKS);
-  const[events,setEvents]=useState(INIT_EVENTS);
-  const[notes,setNotes]=useState(INIT_NOTES);
-  const[ideas,setIdeas]=useState(INIT_IDEAS);
-  const[contacts,setContacts]=useState(INIT_CONTACTS);
-  const[cats,setCats]=useState(DEF_CATS);
-  const[statuses,setStatuses]=useState(DEF_STATUSES);
+  const[page,setPage]=useState(()=>{try{return localStorage.getItem("fd_page")||"dashboard";}catch{return"dashboard";}});
+  const setPageP=p=>{setPage(p);try{localStorage.setItem("fd_page",p);}catch{}};
+  const[tasks,setTasks]=usePersist("fd_tasks",INIT_TASKS);
+  const[events,setEvents]=usePersist("fd_events",INIT_EVENTS);
+  const[notes,setNotes]=usePersist("fd_notes",INIT_NOTES);
+  const[ideas,setIdeas]=usePersist("fd_ideas",INIT_IDEAS);
+  const[contacts,setContacts]=usePersist("fd_contacts",INIT_CONTACTS);
+  const[cats,setCats]=usePersist("fd_cats",DEF_CATS);
+  const[statuses,setStatuses]=usePersist("fd_statuses",DEF_STATUSES);
   const[filesTab,setFilesTab]=useState("contacts");
   const[notesTab,setNotesTab]=useState("work");
   const[mobileOpen,setMobileOpen]=useState(false);
@@ -1061,7 +1095,7 @@ function App(){
   const shared={cats,statuses,deptIds,tagIds,logActivity};
   const priCount=tasks.filter(t=>t.priority&&t.status==="In Progress"&&!snoozed(t)).length;
   const blockCount=tasks.filter(t=>t.status==="Roadblock").length;
-  function Nav({n}){return<button onClick={()=>{setPage(n.id);setMobileOpen(false);}} style={{display:"flex",alignItems:"center",gap:11,padding:"10px 22px",background:page===n.id?"rgba(123,111,255,0.15)":"none",border:"none",cursor:"pointer",textAlign:"left",width:"100%",borderLeft:`3px solid ${page===n.id?R.indigo.h:"transparent"}`,transition:"all 0.15s"}}><span style={{fontSize:15}}>{n.icon}</span><span style={{fontSize:13,fontWeight:page===n.id?700:500,color:page===n.id?R.indigo.t:D.t2}}>{n.l}</span></button>;}
+  function Nav({n}){return<button onClick={()=>{setPageP(n.id);setMobileOpen(false);}} style={{display:"flex",alignItems:"center",gap:11,padding:"10px 22px",background:page===n.id?"rgba(123,111,255,0.15)":"none",border:"none",cursor:"pointer",textAlign:"left",width:"100%",borderLeft:`3px solid ${page===n.id?R.indigo.h:"transparent"}`,transition:"all 0.15s"}}><span style={{fontSize:15}}>{n.icon}</span><span style={{fontSize:13,fontWeight:page===n.id?700:500,color:page===n.id?R.indigo.t:D.t2}}>{n.l}</span></button>;}
   return<div style={{display:"flex",minHeight:"100vh",background:D.bg0}}>
     <div id="mbar" style={{display:"none",position:"fixed",top:0,left:0,right:0,zIndex:200,background:D.bg1,padding:"11px 15px",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${D.bd}`}}>
       <div style={{fontSize:22,fontWeight:800,fontFamily:"'Righteous',cursive",background:RB,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>FlowDesk</div>
@@ -1077,16 +1111,16 @@ function App(){
       {NAV.map(n=><div key={n.id}><Nav n={n}/>
         {/* Notes sub-folders — always visible */}
         {n.id==="notes"&&<div>
-          <button onClick={()=>{setPage("notes");setNotesTab("work");}} style={SUB(page==="notes"&&notesTab==="work")}><span style={{fontSize:13}}>💼</span><span style={{fontSize:12,fontWeight:page==="notes"&&notesTab==="work"?700:400,color:page==="notes"&&notesTab==="work"?R.indigo.t:D.t3}}>Work</span></button>
-          <button onClick={()=>{setPage("notes");setNotesTab("personal");}} style={SUB(page==="notes"&&notesTab==="personal")}><span style={{fontSize:13}}>🏠</span><span style={{fontSize:12,fontWeight:page==="notes"&&notesTab==="personal"?700:400,color:page==="notes"&&notesTab==="personal"?R.indigo.t:D.t3}}>Personal</span></button>
+          <button onClick={()=>{setPageP("notes");setNotesTab("work");}} style={SUB(page==="notes"&&notesTab==="work")}><span style={{fontSize:13}}>💼</span><span style={{fontSize:12,fontWeight:page==="notes"&&notesTab==="work"?700:400,color:page==="notes"&&notesTab==="work"?R.indigo.t:D.t3}}>Work</span></button>
+          <button onClick={()=>{setPageP("notes");setNotesTab("personal");}} style={SUB(page==="notes"&&notesTab==="personal")}><span style={{fontSize:13}}>🏠</span><span style={{fontSize:12,fontWeight:page==="notes"&&notesTab==="personal"?700:400,color:page==="notes"&&notesTab==="personal"?R.indigo.t:D.t3}}>Personal</span></button>
         </div>}
       </div>)}
       <div style={{flex:1}}/>
       {/* Master files — always visible sub-nav */}
       <div style={{borderTop:`1px solid ${D.bd}`}}>
         <Nav n={{id:"files",l:"Master Files",icon:"🗄️"}}/>
-        <button onClick={()=>{setPage("files");setFilesTab("contacts");}} style={SUB(page==="files"&&filesTab==="contacts")}><span style={{fontSize:13}}>📇</span><span style={{fontSize:12,fontWeight:page==="files"&&filesTab==="contacts"?700:400,color:page==="files"&&filesTab==="contacts"?R.indigo.t:D.t3}}>Contacts</span></button>
-        <button onClick={()=>{setPage("files");setFilesTab("system");}} style={SUB(page==="files"&&filesTab==="system")}><span style={{fontSize:13}}>⚙️</span><span style={{fontSize:12,fontWeight:page==="files"&&filesTab==="system"?700:400,color:page==="files"&&filesTab==="system"?R.indigo.t:D.t3}}>System Settings</span></button>
+        <button onClick={()=>{setPageP("files");setFilesTab("contacts");}} style={SUB(page==="files"&&filesTab==="contacts")}><span style={{fontSize:13}}>📇</span><span style={{fontSize:12,fontWeight:page==="files"&&filesTab==="contacts"?700:400,color:page==="files"&&filesTab==="contacts"?R.indigo.t:D.t3}}>Contacts</span></button>
+        <button onClick={()=>{setPageP("files");setFilesTab("system");}} style={SUB(page==="files"&&filesTab==="system")}><span style={{fontSize:13}}>⚙️</span><span style={{fontSize:12,fontWeight:page==="files"&&filesTab==="system"?700:400,color:page==="files"&&filesTab==="system"?R.indigo.t:D.t3}}>System Settings</span></button>
       </div>
       <div style={{padding:"14px 22px",borderTop:`1px solid ${D.bd}`}}>
         <div style={{fontSize:10,color:D.t3,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Quick stats</div>
@@ -1100,7 +1134,7 @@ function App(){
         {page==="calendar" &&<CalendarView events={events} setEvents={setEvents} contacts={contacts} logActivity={logActivity}/>}
         {page==="notes"    &&<Notes     notes={notes}  setNotes={setNotes} folder={notesTab} {...shared}/>}
         {page==="ideas"    &&<Ideas     ideas={ideas}  setIdeas={setIdeas} setTasks={setTasks} {...shared}/>}
-        {page==="files"    &&<MasterFiles contacts={contacts} setContacts={setContacts} cats={cats} setCats={setCats} statuses={statuses} setStatuses={setStatuses} tab={filesTab} tasks={tasks} setTasks={setTasks}/>}
+        {page==="files"    &&<MasterFiles contacts={contacts} setContacts={setContacts} cats={cats} setCats={setCats} statuses={statuses} setStatuses={setStatuses} tab={filesTab} tasks={tasks} setTasks={setTasks} events={events} notes={notes} ideas={ideas}/>}
       </div>
     </div>
     <style>{`@media(max-width:700px){#sidebar{display:none!important;}#mbar{display:flex!important;}#main{padding-top:54px;}}`}</style>
